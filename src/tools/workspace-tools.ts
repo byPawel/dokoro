@@ -1,11 +1,23 @@
 import { z } from 'zod';
 import { promises as fs } from 'fs';
 import path from 'path';
+import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace, generateAgentId, parseAgentFromContent } from '../utils/workspace.js';
 import { CallToolResult } from '../types.js';
 import { DEVLOG_PATH } from '../types/devlog.js';
 import { getSqliteDb } from '../db/index.js';
+
+function getSqlite(): Database.Database {
+  const projectPath = path.dirname(DEVLOG_PATH);
+  return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+}
+
+function db(): Database.Database {
+  const existing = (globalThis as Record<string, unknown>).__TEST_DB__ as Database.Database | undefined;
+  if (existing) return existing;
+  return getSqlite();
+}
 import { acquireLock, releaseLock, checkLock } from '../utils/lock-manager.js';
 import {
   createInitialMetadata,
@@ -555,5 +567,47 @@ export const workspaceTools: ToolDefinition[] = [
         };
       }
     }
-  }
+  },
+
+  {
+    name: 'devlog_session_recall',
+    title: 'Recall past sessions',
+    description: 'Read conversation summaries from finished sessions (episodic memory). Filter by query substring, session_id, or since timestamp.',
+    inputSchema: {
+      query: z.string().optional().describe('Substring to filter summaries.'),
+      session_id: z.string().optional(),
+      since: z.string().optional().describe('ISO timestamp lower bound.'),
+      limit: z.number().int().positive().max(100).optional(),
+    },
+    handler: async (args): Promise<CallToolResult> => {
+      try {
+        const a = args as { query?: string; session_id?: string; since?: string; limit?: number };
+        const where: string[] = [];
+        const params: unknown[] = [];
+        if (a.query)      { where.push('summary LIKE ?');  params.push(`%${a.query}%`); }
+        if (a.session_id) { where.push('session_id = ?'); params.push(a.session_id); }
+        if (a.since)      { where.push('started_at >= ?'); params.push(a.since); }
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        const rows = db().prepare(`
+          SELECT session_id, ai_model, summary, message_count, token_count, started_at, ended_at
+          FROM conversation_summaries
+          ${whereSql}
+          ORDER BY started_at DESC
+          LIMIT ?
+        `).all(...params, a.limit ?? 10) as Array<Record<string, unknown>>;
+
+        const text = rows.map((r) =>
+          `[${r['started_at']}] session=${r['session_id']} model=${r['ai_model']} msgs=${r['message_count']}\n  ${r['summary']}`
+        ).join('\n\n') || '(no past sessions)';
+        return { content: [{ type: 'text' as const, text }] };
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `session_recall failed: ${msg}` }],
+        };
+      }
+    },
+  },
 ];

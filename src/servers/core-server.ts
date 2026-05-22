@@ -21,6 +21,7 @@ const coreTools = [
   workspaceTools.find(t => t.name === 'devlog_workspace_claim')!,
   workspaceTools.find(t => t.name === 'devlog_workspace_dump')!,
   workspaceTools.find(t => t.name === 'devlog_session_log')!,
+  workspaceTools.find(t => t.name === 'devlog_session_recall')!,
 
   // Current.md management
   currentWorkspaceTools.find(t => t.name === 'devlog_current_update')!,
