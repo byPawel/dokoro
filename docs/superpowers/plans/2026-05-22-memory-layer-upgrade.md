@@ -964,4 +964,21 @@ git status
 
 ## Kill-list confirmed (Task 1 — fill in after running Task 1)
 
-(leave blank — populated during Task 1 Step 3)
+Verified on 2026-05-22 in worktree `worktree-memory-layer-upgrade`.
+
+### Safe to drop (Task 6)
+- `session_context` — refs found: 0 (schema only)
+- `knowledge_links` — refs found: 0 (schema only)
+- `sync_queue` — refs found: 0 (schema only)
+- `daily_timeline` — refs found: 0 (schema only)
+- `modifications` — refs found: 1 (HTML comment in devlog-http-server.ts:232, not a live reference)
+- `doc_assignments` — refs found: 0 (schema only)
+
+### NOT safe to drop (keep in Task 6 — move to follow-up if needed)
+- (none — all suspected-dead tables confirmed as dead)
+
+### Safe to delete (Task 7)
+- `src/simple-devlog-server.ts` — stale comment reference only in `src/tools/enhanced-compression-helper.ts:31`. Legacy test script `test-mcp.sh` and config script `update-claude-config.sh` reference it but are not invoked by package.json or any active code path. No actual imports.
+
+### Surprises / follow-ups
+- None. All assumptions from the one-pass audit were confirmed. Legacy scripts exist but are inert.
