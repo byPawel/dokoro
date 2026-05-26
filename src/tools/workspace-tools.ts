@@ -570,6 +570,51 @@ export const workspaceTools: ToolDefinition[] = [
   },
 
   {
+    name: 'devlog_session_summary_add',
+    title: 'Record a session summary',
+    description: 'Persist a conversation summary into episodic memory (conversation_summaries), readable later via devlog_session_recall.',
+    inputSchema: {
+      session_id: z.string(),
+      ai_model: z.string(),
+      summary: z.string(),
+      key_decisions: z.array(z.string()).optional(),
+      key_topics: z.array(z.string()).optional(),
+      message_count: z.number().int().optional(),
+      token_count: z.number().int().optional(),
+    },
+    handler: async (args): Promise<CallToolResult> => {
+      try {
+        const a = args as {
+          session_id: string;
+          ai_model: string;
+          summary: string;
+          key_decisions?: string[];
+          key_topics?: string[];
+          message_count?: number;
+          token_count?: number;
+        };
+        db().prepare(`INSERT INTO conversation_summaries
+          (session_id, ai_model, summary, key_decisions_json, key_topics_json, message_count, token_count, started_at)
+          VALUES (?,?,?,?,?,?,?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`).run(
+          a.session_id,
+          a.ai_model,
+          a.summary,
+          a.key_decisions ? JSON.stringify(a.key_decisions) : null,
+          a.key_topics ? JSON.stringify(a.key_topics) : null,
+          a.message_count ?? null,
+          a.token_count ?? null,
+        );
+        return { content: [{ type: 'text' as const, text: `summary recorded for session ${a.session_id}` }] };
+      } catch (e) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `session_summary_add failed: ${(e as Error).message}` }],
+        };
+      }
+    },
+  },
+
+  {
     name: 'devlog_session_recall',
     title: 'Recall past sessions',
     description: 'Read conversation summaries from finished sessions (episodic memory). Filter by query substring, session_id, or since timestamp.',
