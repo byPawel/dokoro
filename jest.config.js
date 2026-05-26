@@ -12,5 +12,9 @@ export default {
   transformIgnorePatterns: [
     "/node_modules/(?!eventsource)/"
   ],
-  testPathIgnorePatterns: ["/node_modules/", "/dist/"],
+  testPathIgnorePatterns: ["/node_modules/", "/dist/", "/\\.claude/"],
+  // Keep jest-haste-map from crawling git worktrees under .claude/, which would
+  // otherwise collide on duplicate manual mocks (pkce-challenge) and haste module
+  // names (@devlog-mcp/core).
+  modulePathIgnorePatterns: ["<rootDir>/\\.claude/"],
 };

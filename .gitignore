@@ -152,7 +152,5 @@ drizzle/meta/
 
 # MCP-specific
 .mcp-current
-devlog.log
-*.log
 session-logs/
 .devlog/

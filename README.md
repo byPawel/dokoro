@@ -240,7 +240,7 @@ Tools are organised by which memory layer they read or write.
 
 </details>
 
-> Tools above are exposed by the **core server** (`dist/esm/servers/core-server.js`). The optional **analytics server** (`dist/esm/servers/analytics-server.js`) adds `devlog_compress_week`. Other modular servers (search, planning, tracking) expose additional tools not yet wired into core — see `src/servers/*.ts`.
+> Tools above are exposed by the **core server** (`dist/servers/core-server.js`). The optional **analytics server** (`dist/servers/analytics-server.js`) adds `devlog_compress_week`. Other modular servers (search, planning, tracking) expose additional tools not yet wired into core — see `src/servers/*.ts`.
 
 ---
 

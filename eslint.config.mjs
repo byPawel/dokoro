@@ -7,7 +7,7 @@ export default tseslint.config(
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        ignores: ["dist/**", "node_modules/**", "coverage/**", "*.config.js", "*.config.mjs", "*.config.cjs", "final-fix.cjs", "fix-eslint-errors.cjs"],
+        ignores: ["dist/**", "node_modules/**", "coverage/**", ".claude/**", "*.config.js", "*.config.mjs", "*.config.cjs"],
     },
     {
         languageOptions: {
