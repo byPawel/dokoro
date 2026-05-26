@@ -15,13 +15,15 @@ import { entityTools } from '../tools/entity-tools.js';
 import { feedbackTools } from '../tools/feedback-tools.js';
 
 // Select only the core tools
-const coreTools = [
+// Exported for use in tests.
+export const coreTools = [
   // Workspace management (includes time tracking)
   workspaceTools.find(t => t.name === 'devlog_workspace_status')!,
   workspaceTools.find(t => t.name === 'devlog_workspace_claim')!,
   workspaceTools.find(t => t.name === 'devlog_workspace_dump')!,
   workspaceTools.find(t => t.name === 'devlog_session_log')!,
   workspaceTools.find(t => t.name === 'devlog_session_recall')!,
+  workspaceTools.find(t => t.name === 'devlog_session_summary_add')!,
 
   // Current.md management
   currentWorkspaceTools.find(t => t.name === 'devlog_current_update')!,
