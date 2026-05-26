@@ -35,21 +35,28 @@ export function ensureEntityTables(sqlite: Database.Database): void {
     )
   `).run();
 
+  // Surrogate `id` PK + a partial unique index on open facts (see below) so the
+  // same (source,target,relation_type) tuple can hold many bi-temporal slices —
+  // historical closed rows plus exactly one currently-open row. ISO-8601 'Z'
+  // datetime defaults so lexicographic valid_from/valid_to comparisons line up
+  // with the ISO timestamps the write/read paths use (BUG-1, BUG-6).
   sqlite.prepare(`
     CREATE TABLE IF NOT EXISTS entity_relations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       source_id INTEGER NOT NULL,
       target_id INTEGER NOT NULL,
       relation_type TEXT NOT NULL,
       weight REAL DEFAULT 1.0,
       metadata_json TEXT,
-      valid_from TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      valid_from TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
       valid_to TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (source_id, target_id, relation_type)
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
     )
   `).run();
 
-  // Idempotent ALTER TABLE for existing databases that pre-date bi-temporal columns
+  // Idempotent ALTER TABLE for existing databases that pre-date bi-temporal columns.
+  // (Fresh DBs already have the columns from the CREATE above; the structural PK
+  // redesign for legacy DBs is handled by migration v2 in migrations.ts.)
   const cols = sqlite.prepare(`PRAGMA table_info(entity_relations)`).all() as Array<{ name: string }>;
   const hasValidFrom = cols.some((c) => c.name === 'valid_from');
   const hasValidTo = cols.some((c) => c.name === 'valid_to');
@@ -73,4 +80,11 @@ export function ensureEntityTables(sqlite: Database.Database): void {
   sqlite.prepare('CREATE INDEX IF NOT EXISTS idx_entity_rel_source ON entity_relations(source_id)').run();
   sqlite.prepare('CREATE INDEX IF NOT EXISTS idx_entity_rel_target ON entity_relations(target_id)').run();
   sqlite.prepare('CREATE INDEX IF NOT EXISTS idx_entity_rel_valid_to ON entity_relations(valid_to)').run();
+
+  // Only one OPEN (valid_to IS NULL) row per tuple; closed slices may accumulate.
+  sqlite.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uq_entity_rel_open
+    ON entity_relations(source_id, target_id, relation_type) WHERE valid_to IS NULL`).run();
+  // Hot path: temporal traversal per node (BUG-15).
+  sqlite.prepare(`CREATE INDEX IF NOT EXISTS idx_entity_rel_temporal
+    ON entity_relations(source_id, valid_from, valid_to)`).run();
 }
