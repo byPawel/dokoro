@@ -19,4 +19,23 @@ describe('runMigrations', () => {
     const after = (db.prepare('SELECT COUNT(*) c FROM schema_version').get() as { c: number }).c;
     expect(after).toBe(before);
   });
+
+  it('rolls back a failing migration: no version row is recorded', () => {
+    runMigrations(db); // apply existing migrations first
+    const failingVersion = MIGRATIONS[MIGRATIONS.length - 1].version + 1;
+    MIGRATIONS.push({
+      version: failingVersion,
+      description: 'intentionally failing migration',
+      up: () => { throw new Error('boom'); },
+    });
+    try {
+      expect(() => runMigrations(db)).toThrow('boom');
+      const row = db
+        .prepare('SELECT COUNT(*) c FROM schema_version WHERE version = ?')
+        .get(failingVersion) as { c: number };
+      expect(row.c).toBe(0);
+    } finally {
+      MIGRATIONS.pop();
+    }
+  });
 });

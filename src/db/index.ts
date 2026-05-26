@@ -16,6 +16,7 @@ import * as schema from "./schema.js";
 import { ensureAgentFeedbackTable } from "./agent-feedback.js";
 import { ensureEntityTables } from "./entity-tables.js";
 import { dropDeadTables } from "./drop-dead-tables.js";
+import { runMigrations } from "./migrations.js";
 
 export { ensureAgentFeedbackTable };
 export { ensureEntityTables };
@@ -133,11 +134,10 @@ export function getDb(config: DevlogDbConfig): DevlogDB {
   // Ensure vector tables exist
   ensureVectorTables(sqlite);
 
-  // Ensure entity graph tables exist
-  ensureEntityTables(sqlite);
-
-  // Ensure agent feedback table exists (affective memory layer)
-  ensureAgentFeedbackTable(sqlite);
+  // Run version-gated migrations (entity graph + agent feedback tables, etc.).
+  // Migration v1 runs ensureEntityTables + ensureAgentFeedbackTable and bumps
+  // schema_version, so the schema version row is now kept up to date (BUG-5).
+  runMigrations(sqlite);
 
   // Drop tables that were defined in the original schema but never used in
   // production code. Idempotent — safe to run on every startup.
