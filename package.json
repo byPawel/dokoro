@@ -4,12 +4,12 @@
   "description": "Developer logging and workspace management MCP servers for multiple AI CLIs (based on MCP SDK v1.17.1)",
   "license": "MIT",
   "author": "Pawel Pawlowski",
-  "homepage": "https://github.com/pavveu/devlog-mcp",
-  "bugs": "https://github.com/pavveu/devlog-mcp/issues",
+  "homepage": "https://github.com/byPawel/devlog-mcp",
+  "bugs": "https://github.com/byPawel/devlog-mcp/issues",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pavveu/devlog-mcp.git"
+    "url": "git+https://github.com/byPawel/devlog-mcp.git"
   },
   "engines": {
     "node": ">=18"
@@ -49,7 +49,7 @@
     "devlog:init": "tsx src/devlog-cli.ts init",
     "devlog:migrate": "tsx src/devlog-cli.ts migrate",
     "devlog:cleanup": "tsx scripts/cleanup.ts",
-    "fetch:spec-types": "curl -o spec.types.ts https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/refs/heads/main/schema/draft/schema.ts",
+    "fetch:spec-types": "curl -o spec.types.ts https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/refs/heads/main/schema/2025-06-18/schema.ts",
     "build": "npm run build:esm && npm run build:servers",
     "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
     "build:esm:w": "npm run build:esm -- -w",
