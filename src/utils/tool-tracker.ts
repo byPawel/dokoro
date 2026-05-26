@@ -164,7 +164,10 @@ export function withToolTracking<T extends (...args: unknown[]) => Promise<unkno
     const t0 = Date.now();
     try {
       const result = await handler(...args);
-      recordAutoFeedback(toolName, 'success', Date.now() - t0);
+      // MCP handlers commonly report errors as a return value `{ isError: true, ... }`
+      // rather than throwing. Treat those as failures so they don't pollute routing.
+      const isError = (result as { isError?: unknown } | null | undefined)?.isError === true;
+      recordAutoFeedback(toolName, isError ? 'failure' : 'success', Date.now() - t0);
       return result;
     } catch (err) {
       recordAutoFeedback(toolName, 'failure', Date.now() - t0);

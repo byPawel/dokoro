@@ -177,8 +177,8 @@ export const feedbackTools: ToolDefinition[] = [
         if (a.agent_id)  { where.push('agent_id = ?');  params.push(a.agent_id); }
         const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-        // GROUP BY: include agent_id when no agent filter to avoid cross-agent contamination (BUG-17)
-        const groupBy = a.agent_id ? 'GROUP BY tool_name' : 'GROUP BY agent_id, tool_name';
+        // Grouping is done in JS below: by tool_name when an agent filter is set,
+        // else by (agent_id, tool_name) to avoid cross-agent contamination (BUG-17).
 
         // Fetch raw rows — we compute decay and Wilson in JS to keep the SQL readable
         // and avoid SQLite's lack of POW().  (SQLite has EXP/LOG but better to be explicit.)
@@ -230,7 +230,7 @@ export const feedbackTools: ToolDefinition[] = [
 
         const entries: RouteEntry[] = [];
 
-        for (const [key, grpRows] of groups) {
+        for (const grpRows of groups.values()) {
           const first = grpRows[0];
           const tool_name = first.tool_name;
           const agent_id = a.agent_id ?? first.agent_id;
@@ -273,9 +273,6 @@ export const feedbackTools: ToolDefinition[] = [
             wilson_lower,
             confident: n >= minSamples,
           });
-
-          void groupBy; // suppress unused-var lint on groupBy (it's logically captured via key)
-          void key;
         }
 
         // Sort by Wilson lower bound descending

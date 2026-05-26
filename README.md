@@ -78,8 +78,8 @@ Every tool outcome is recorded (outcome, confidence, latency) — automatically 
 }
 ```
 ```
-devlog_session_recall:      n=89  success=89 fail=0 partial=0  wilson_lower=0.96  decayed_rate=1.00  confident=true
-devlog_entity_extract_deep: n=142 success=125 fail=2 timeout=15 wilson_lower=0.82 decayed_rate=0.86  confident=true
+devlog_session_recall:      n=89  success=89  failure=0 partial=0 rejected=0 timeout=0  decayed_rate=1.000 wilson_lower=0.9583 confident=true
+devlog_entity_extract_deep: n=142 success=125 failure=2 partial=0 rejected=0 timeout=15 decayed_rate=0.864 wilson_lower=0.8213 confident=true
 ```
 
 > Ranking is a **Wilson lower bound** (so a single lucky success can't outrank a long track record) with **recency decay** (`half_life_days`, so stale failures fade) and a `confident` flag once a tool clears the minimum sample size. The agent prefers the higher `wilson_lower` — turning past outcomes into a routing policy. Raw aggregates remain available via `devlog_feedback_query`.

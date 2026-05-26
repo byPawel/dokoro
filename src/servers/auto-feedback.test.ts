@@ -93,6 +93,23 @@ describe('withToolTracking auto-feedback', () => {
     expect(typeof row!.latency_ms).toBe('number');
   });
 
+  it('records outcome=failure when handler RETURNS { isError: true }, and result is still returned (not thrown)', async () => {
+    const errResult = { isError: true, content: [{ type: 'text' as const, text: 'boom' }] };
+    const handler = async (..._args: unknown[]) => errResult;
+    const tracked = withToolTracking('soft_fail_tool', handler);
+
+    // Must resolve (not reject) and return the result unchanged
+    const returned = await tracked({});
+    expect(returned).toBe(errResult);
+
+    const row = db.prepare(`SELECT outcome, latency_ms FROM agent_feedback WHERE tool_name = ?`)
+      .get('soft_fail_tool') as { outcome: string; latency_ms: number } | undefined;
+
+    expect(row).toBeDefined();
+    expect(row!.outcome).toBe('failure');
+    expect(typeof row!.latency_ms).toBe('number');
+  });
+
   it('skips recording when DEVLOG_AUTO_FEEDBACK=false', async () => {
     process.env.DEVLOG_AUTO_FEEDBACK = 'false';
 
