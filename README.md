@@ -2,10 +2,10 @@
 
 # 🧠 devlog-mcp
 
-### Agent Memory for Claude Code & friends
+### Agent memory for Claude Code — with affective routing & bi-temporal facts
 
-A multi-layer **agent memory** MCP server — a persistent brain for your LLM agent.
-Remember what you're doing, what you did, what you know, and how well your tools work — across sessions, models, and projects.
+A multi-layer **agent memory** MCP server: a persistent brain for your LLM agent.
+Remember what you're doing, what you did, what you know, and **how well each tool actually performs** — across sessions, models, and projects.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-43853d.svg)](https://nodejs.org)
@@ -35,35 +35,6 @@ An LLM agent's context window is its only memory, and it's wiped at the end of e
 
 ---
 
-## How an agent uses it
-
-`devlog-mcp` is an MCP server: it exposes tools, and the agent — Claude Code, Gemini CLI, or any MCP client — calls them. There is no autonomy on the server side. **The server stores and serves; the agent reads and writes.** A typical session forms a loop across the layers:
-
-```
-   ┌──────────────────────────── session ────────────────────────────┐
-   │                                                                   │
-   ▼                                                                   │
- 1. RESUME      workspace_status · session_recall      (read working + episodic)
- 2. ORIENT      entity_graph · plan_status             (read semantic + procedural)
- 3. ACT         workspace_claim · session_log          (write working)
- 4. REFLECT     feedback_record                        (write affective)
- 5. ROUTE       feedback_query                         (read affective)  ──┐
- 6. PERSIST     workspace_dump                          (write → episodic) │
-   │                                                                       │
-   └───────────────────────────────────────────────────────────────────◄─┘
-```
-
-1. **Resume** — on wake, `devlog_workspace_status` shows whether a task is already in flight, and `devlog_session_recall` loads summaries of prior sessions. The agent starts informed instead of blank.
-2. **Orient** — before editing, `devlog_entity_graph` reveals the relevant files/services/decisions and how they relate; `devlog_plan_status` shows which plan tasks remain.
-3. **Act** — it claims the workspace (`devlog_workspace_claim`, a file-based lock so two agents don't collide), logs progress with `devlog_session_log`, and records open questions with `devlog_question_add`.
-4. **Reflect** — after each significant tool call, `devlog_feedback_record` captures the outcome (success / failure / latency / confidence), building a per-tool, per-agent track record.
-5. **Route** — on the next decision, `devlog_feedback_query` lets the agent bias itself toward the model or tool that has historically succeeded at this kind of task.
-6. **Persist** — at session end, `devlog_workspace_dump` flushes the active workspace into durable storage and registers documents in SQLite, ready for the next recall.
-
-The payoff: the agent never holds all of this in its context window. It pulls the slice it needs from the layer that owns it, then writes back what it learned.
-
----
-
 ## In practice — a Claude Code session
 
 **Monday.** Claude Code fixes a flaky login test and logs it as it goes:
@@ -86,7 +57,7 @@ Claude ▸ [calls devlog_session_recall { query: "login bug", since: "7d" }]
          Resuming there — writing the regression test now.
 ```
 
-That `devlog_session_recall` call returns structured episodic memory the agent can act on directly:
+That `devlog_session_recall` call returns structured episodic memory the agent acts on directly:
 
 ```json
 {
@@ -98,31 +69,95 @@ That `devlog_session_recall` call returns structured episodic memory the agent c
 }
 ```
 
-**Friday.** `devlog_compress_week` rolls the week's sessions into a retrospective — including a task-distribution breakdown rendered as Mermaid:
+---
 
-```mermaid
-pie title Task Distribution — Week of May 19
-    "Features"  : 45
-    "Bug Fixes" : 20
-    "Research"  : 20
-    "Planning"  : 10
-    "Other"     : 5
+## What makes it different
+
+Most memory servers stop at "store text, retrieve by similarity." Two capabilities set `devlog-mcp` apart — and both are queryable as plain MCP tool calls.
+
+### ❤️ Affective memory — the agent learns which tools to trust
+
+Every tool outcome is recorded (`devlog_feedback_record`). Later, the agent asks for a tool's track record and **routes itself accordingly** — no other popular OSS memory lib (Mem0, Letta, Zep, Cognee, LangMem) does this natively.
+
+```jsonc
+// MCP tools/call
+{
+  "name": "devlog_feedback_query",
+  "arguments": { "tool_name": "devlog_entity_extract_deep", "agent": "claude-code" }
+}
+```
+```json
+{
+  "tool_name": "devlog_entity_extract_deep",
+  "calls": 142,
+  "success_rate": 0.88,
+  "avg_latency_ms": 1840,
+  "recent_failures": 2,
+  "routing_hint": "reliable — prefer over regex fallback for prose docs"
+}
 ```
 
-> Each example maps to one layer: the recall is **episodic**, the entity links feed the **semantic** graph, the open question lives in **working** memory, and `feedback_query` (below) reads the **affective** layer to pick the right tool next time.
+> The agent reads `success_rate` and `routing_hint` and biases its next decision toward what has actually worked — turning past outcomes into a routing policy.
+
+### 🕒 Bi-temporal facts — query the graph "as of" any point in time
+
+Every `entity_relations` row carries `valid_from` / `valid_to` (Zep/Graphiti-style). Contradictions don't overwrite — they **close a window**. Pass `as_of` to see what was true at a past moment:
+
+```jsonc
+// MCP tools/call
+{
+  "name": "devlog_entity_graph",
+  "arguments": { "entity": "auth/session.ts", "as_of": "2026-04-01T00:00:00Z" }
+}
+```
+```json
+{
+  "entity": "auth/session.ts",
+  "relations": [
+    {
+      "predicate": "uses",
+      "object": "jwt-stateless-tokens",
+      "valid_from": "2026-01-10T00:00:00Z",
+      "valid_to": "2026-05-01T00:00:00Z",
+      "superseded_by": "oauth2-sessions"
+    }
+  ],
+  "note": "As of 2026-04-01 the module still used JWT; migration to OAuth2 landed May 1."
+}
+```
+
+> Ask "what did we believe last quarter?" and get the answer that was current *then*, not the latest overwrite.
+
+Plus: **hybrid search** (SQLite FTS5 + LanceDB vectors via Reciprocal Rank Fusion) and an **optional local LLM** (Ollama) for embeddings and deep entity extraction — the server runs fine without it, falling back to regex.
 
 ---
 
-## Works with your agent
+## How an agent uses it
 
-Claude Code is the hero use case throughout this README, but `devlog-mcp` is a standard MCP server — any MCP-compatible client connects the same way and speaks the same tools.
+`devlog-mcp` is an MCP server: it exposes tools, and the agent — Claude Code, Gemini CLI, or any MCP client — calls them. There is no autonomy on the server side. **The server stores and serves; the agent reads and writes.** A typical session forms a loop across the layers:
 
-| Client / Agent | How it connects |
-|---|---|
-| **Claude Code** | Native MCP config (`claude mcp add …`) — see [Quick start](#quick-start) |
-| **Gemini CLI** | MCP over stdio |
-| **Cursor / Continue / Cline** | MCP extension or settings entry |
-| **Any MCP client** | JSON-RPC 2.0 over stdio |
+```
+   ┌──────────────────────────── session ────────────────────────────┐
+   │                                                                   │
+   ▼                                                                   │
+ 1. RESUME      workspace_status · session_recall      (read working + episodic)
+ 2. ORIENT      entity_graph · plan_status             (read semantic + procedural)
+ 3. ACT         workspace_claim · session_log          (write working)
+ 4. REFLECT     feedback_record                        (write affective)
+ 5. ROUTE       feedback_query                         (read affective)  ──┐
+ 6. PERSIST     workspace_dump                          (write → episodic) │
+   │                                                                       │
+   └───────────────────────────────────────────────────────────────────◄─┘
+```
+
+1. **Resume** — `devlog_workspace_status` shows whether a task is already in flight; `devlog_session_recall` loads summaries of prior sessions. The agent starts informed instead of blank.
+2. **Orient** — `devlog_entity_graph` reveals the relevant files/services/decisions and how they relate; `devlog_plan_status` shows which plan tasks remain.
+3. **Act** — it claims the workspace (`devlog_workspace_claim`, a file-based lock so two agents don't collide), logs progress with `devlog_session_log`, records open questions with `devlog_question_add`.
+4. **Reflect** — after each significant tool call, `devlog_feedback_record` captures the outcome (success / failure / latency / confidence).
+5. **Route** — `devlog_feedback_query` lets the agent bias itself toward the model or tool that has historically succeeded.
+6. **Persist** — `devlog_workspace_dump` flushes the active workspace into durable storage, ready for the next recall.
+
+The payoff: the agent never holds all of this in its context window. It pulls the slice it needs from the layer that owns it, then writes back what it learned.
 
 ---
 
@@ -135,59 +170,6 @@ Claude Code is the hero use case throughout this README, but `devlog-mcp` is a s
 | 🟣 **Semantic** | Facts, entities, relations, tags, doc vectors | `entities`, `entity_relations` (bi-temporal), `doc_entities`, `tags`, `doc_tags`, `docs`, LanceDB `doc_vectors` + `chunks` | `devlog_entity_graph`, `devlog_entity_extract_deep` |
 | 🟠 **Procedural** | Plans, workflows, checklists | `docs(doc_type='plan')` + plan JSON files | `devlog_plan_create`, `devlog_plan_check`, `devlog_plan_validate`, `devlog_plan_status`, `devlog_plan_list`, `devlog_plan_blocker` |
 | 🔴 **Affective** | Per-tool/per-agent success, failure, latency, confidence | `agent_feedback` | `devlog_feedback_record`, `devlog_feedback_query` |
-
-### What sets it apart
-
-- **🕒 Bi-temporal facts** (Zep/Graphiti-style) — every `entity_relations` row carries `valid_from` / `valid_to`. Contradictions don't overwrite; they close a window. Query the graph *"as of"* any timestamp via the `as_of` param on `devlog_entity_graph`.
-- **🔎 Hybrid search** — SQLite FTS5 + LanceDB vectors, merged via Reciprocal Rank Fusion.
-- **❤️ Affective layer** — among popular OSS memory libs (Mem0, Letta, Zep, Cognee, LangMem), `devlog-mcp` is the only one that natively tracks per-tool success/failure history (`agent_feedback`). Use it to bias model routing.
-- **🦙 Optional, local LLM** — Ollama (`nomic-embed-text` + `llama3.2`) for embeddings and deep entity extraction. The server runs fine without it, falling back to regex extraction.
-
----
-
-## Quick start
-
-### Installation
-
-```bash
-# 1. Clone
-git clone https://github.com/pavveu/devlog-mcp
-cd devlog-mcp
-
-# 2. Install dependencies
-npm install
-
-# 3. Configure environment (API keys optional)
-cp .env.example .env.local
-
-# 4. Build
-npm run build
-```
-
-Then register the server with Claude:
-
-```bash
-# Core server (essential features)
-claude mcp add devlog-core "node" "$(pwd)/dist/servers/core-server.js"
-
-# …or with environment variables
-claude mcp add devlog-core "$(pwd)/../mcp-wrapper.sh" ".env.local" "node" "$(pwd)/dist/servers/core-server.js"
-```
-
-### Ollama setup (optional)
-
-Enables embeddings and deep entity extraction. Needed only for `devlog_entity_extract_deep` and LanceDB vector indexing — every other tool works without it.
-
-```bash
-# Install from https://ollama.com, then:
-ollama pull nomic-embed-text
-ollama pull llama3.2
-ollama serve            # runs as a background service on most platforms
-```
-
----
-
-## Architecture at a glance
 
 ```
 ┌───────────── working ─────────────┐    ┌───────── affective ──────────┐
@@ -280,13 +262,60 @@ Tools are organised by which memory layer they read or write.
 
 </details>
 
-> Tools above are exposed by the **core server** (`dist/esm/servers/core-server.js`). The optional **analytics server** (`dist/esm/servers/analytics-server.js`) adds `devlog_compress_week`. Other modular servers (search, planning, tracking) expose additional tools that are not yet wired into core — see `src/servers/*.ts` for current registrations.
+> Tools above are exposed by the **core server** (`dist/esm/servers/core-server.js`). The optional **analytics server** (`dist/esm/servers/analytics-server.js`) adds `devlog_compress_week`. Other modular servers (search, planning, tracking) expose additional tools not yet wired into core — see `src/servers/*.ts`.
 
 ---
 
-## Integration with `tachibot-mcp`
+## Works with your agent
 
-`devlog-mcp` is the memory backend for [`tachibot-mcp`](https://github.com/pavveu/tachibot-mcp) (a multi-model orchestrator). Bridge tools — `bridge_index_research`, `bridge_import_plan`, `bridge_get_context` — connect tachibot's reasoning outputs into devlog's semantic layer. See [`docs/superpowers/plans/2026-05-22-tachibot-as-orchestrator.md`](docs/superpowers/plans/2026-05-22-tachibot-as-orchestrator.md) for the full integration design.
+Claude Code is the hero use case throughout this README, but `devlog-mcp` is a standard MCP server — any MCP-compatible client connects the same way and speaks the same tools.
+
+| Client / Agent | How it connects |
+|---|---|
+| **Claude Code** | Native MCP config (`claude mcp add …`) — see [Quick start](#quick-start) |
+| **Gemini CLI** | MCP over stdio |
+| **Cursor / Continue / Cline** | MCP extension or settings entry |
+| **Any MCP client** | JSON-RPC 2.0 over stdio |
+
+---
+
+## Quick start
+
+```bash
+# 1. Clone
+git clone https://github.com/byPawel/devlog-mcp
+cd devlog-mcp
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment (API keys optional)
+cp .env.example .env.local
+
+# 4. Build
+npm run build
+```
+
+Register the server with Claude:
+
+```bash
+# Core server (essential features)
+claude mcp add devlog-core "node" "$(pwd)/dist/servers/core-server.js"
+
+# …or with environment variables
+claude mcp add devlog-core "$(pwd)/../mcp-wrapper.sh" ".env.local" "node" "$(pwd)/dist/servers/core-server.js"
+```
+
+### Ollama setup (optional)
+
+Enables embeddings and deep entity extraction. Needed only for `devlog_entity_extract_deep` and LanceDB vector indexing — every other tool works without it.
+
+```bash
+# Install from https://ollama.com, then:
+ollama pull nomic-embed-text
+ollama pull llama3.2
+ollama serve            # runs as a background service on most platforms
+```
 
 ---
 
