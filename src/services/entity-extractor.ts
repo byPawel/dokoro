@@ -627,6 +627,13 @@ export class RelationDetector {
 // EntityPersistence
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Relations where a source has at most ONE valid target at a time. Only these
+// evict prior open windows on contradiction. The currently-extracted types
+// (implements, depends_on, blocks, authored_by) are all many-valued, so this is
+// empty by default — preventing false invalidation. Add genuinely single-valued
+// relations (e.g. a future 'current_status') here to enable window-closing for them.
+export const FUNCTIONAL_RELATION_TYPES = new Set<string>([]);
+
 /**
  * Persists extracted entities and relations to SQLite.
  *
@@ -696,7 +703,9 @@ export class EntityPersistence {
   ): void {
     const now = validFrom ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     if (this.stmtFindOpenSameTuple.get(sourceId, targetId, relationType)) return; // already open — idempotent
-    this.stmtCloseOpenForSourceType.run(now, sourceId, relationType, targetId);
+    if (FUNCTIONAL_RELATION_TYPES.has(relationType)) {
+      this.stmtCloseOpenForSourceType.run(now, sourceId, relationType, targetId);
+    }
     this.stmtInsertRelation.run(sourceId, targetId, relationType, weight, now);
   }
 
