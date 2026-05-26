@@ -61,6 +61,8 @@ function checkCancelledNotification(
   spec: StripEnvelope<SpecTypes.CancelledNotification>
 ) {
   sdk = spec;
+  // @ts-expect-error - SDK makes CancelledNotification.params.requestId optional,
+  // whereas the 2025-06-18 spec requires it (RequestIdSchema.optional() vs requestId: RequestId).
   spec = sdk;
 }
 function checkBaseMetadata(
@@ -138,7 +140,6 @@ function checkElicitRequest(
   sdk: RemovePassthrough<SDKTypes.ElicitRequest>,
   spec: StripEnvelope<SpecTypes.ElicitRequest>
 ) {
-  // @ts-expect-error - Spec split ElicitRequestParams into Form|URL union; SDK only supports form mode
   sdk = spec;
   spec = sdk;
 }
@@ -216,7 +217,6 @@ function checkJSONRPCResponse(
   sdk: SDKTypes.JSONRPCResponse,
   spec: SpecTypes.JSONRPCResponse
 ) {
-  // @ts-expect-error - Spec's JSONRPCResponse includes both result and error responses; SDK separates them
   sdk = spec;
   spec = sdk;
 }
@@ -245,8 +245,9 @@ function checkClientNotification(
   sdk: RemovePassthrough<SDKTypes.ClientNotification>,
   spec: StripEnvelopeUnion<SpecTypes.ClientNotification>
 ) {
-  // @ts-expect-error - Spec adds TaskStatusNotification to union
   sdk = spec;
+  // @ts-expect-error - SDK makes CancelledNotification.params.requestId optional,
+  // whereas the 2025-06-18 spec requires it (CancelledNotification is part of this union).
   spec = sdk;
 }
 function checkServerResult(
@@ -351,7 +352,6 @@ function checkSamplingMessage(
   sdk: RemovePassthrough<SDKTypes.SamplingMessage>,
   spec: SpecTypes.SamplingMessage
 ) {
-  // @ts-expect-error - Spec allows content as array and adds ToolUseContent/ToolResultContent types
   sdk = spec;
   spec = sdk;
 }
@@ -359,7 +359,6 @@ function checkCreateMessageResult(
   sdk: RemovePassthrough<SDKTypes.CreateMessageResult>,
   spec: SpecTypes.CreateMessageResult
 ) {
-  // @ts-expect-error - Spec's SamplingMessage content is a superset of SDK's
   sdk = spec;
   spec = sdk;
 }
@@ -577,7 +576,6 @@ function checkEnumSchema(
   sdk: RemovePassthrough<SDKTypes.EnumSchema>,
   spec: SpecTypes.EnumSchema
 ) {
-  // @ts-expect-error - Spec restructured EnumSchema into SingleSelect|MultiSelect|Legacy union
   sdk = spec;
   spec = sdk;
 }
@@ -585,15 +583,13 @@ function checkPrimitiveSchemaDefinition(
   sdk: RemovePassthrough<SDKTypes.PrimitiveSchemaDefinition>,
   spec: SpecTypes.PrimitiveSchemaDefinition
 ) {
-  // @ts-expect-error - Spec's EnumSchema structural changes cascade here
   sdk = spec;
   spec = sdk;
 }
-function checkJSONRPCErrorResponse(
+function checkJSONRPCError(
   sdk: SDKTypes.JSONRPCError,
-  spec: SpecTypes.JSONRPCErrorResponse
+  spec: SpecTypes.JSONRPCError
 ) {
-  // @ts-expect-error - Spec makes id optional on error responses (request may not have been parseable)
   sdk = spec;
   spec = sdk;
 }
@@ -601,7 +597,6 @@ function checkJSONRPCMessage(
   sdk: SDKTypes.JSONRPCMessage,
   spec: SpecTypes.JSONRPCMessage
 ) {
-  // @ts-expect-error - Spec's JSONRPCResponse includes errors; message union structure differs
   sdk = spec;
   spec = sdk;
 }
@@ -609,7 +604,6 @@ function checkCreateMessageRequest(
   sdk: RemovePassthrough<SDKTypes.CreateMessageRequest>,
   spec: StripEnvelope<SpecTypes.CreateMessageRequest>
 ) {
-  // @ts-expect-error - Spec's SamplingMessage content is a superset of SDK's
   sdk = spec;
   spec = sdk;
 }
@@ -645,7 +639,6 @@ function checkClientRequest(
   sdk: RemovePassthrough<SDKTypes.ClientRequest>,
   spec: StripEnvelopeUnion<SpecTypes.ClientRequest>
 ) {
-  // @ts-expect-error - Spec adds task-related requests to the union
   sdk = spec;
   spec = sdk;
 }
@@ -653,7 +646,6 @@ function checkServerRequest(
   sdk: RemovePassthrough<SDKTypes.ServerRequest>,
   spec: StripEnvelopeUnion<SpecTypes.ServerRequest>
 ) {
-  // @ts-expect-error - Spec adds task-related requests; ElicitRequest params union changed
   sdk = spec;
   spec = sdk;
 }
@@ -668,8 +660,9 @@ function checkServerNotification(
   sdk: RemovePassthrough<MakeUnknownsNotOptional<SDKTypes.ServerNotification>>,
   spec: StripEnvelopeUnion<SpecTypes.ServerNotification>
 ) {
-  // @ts-expect-error - Spec adds ElicitationCompleteNotification and TaskStatusNotification to union
   sdk = spec;
+  // @ts-expect-error - SDK makes CancelledNotification.params.requestId optional,
+  // whereas the 2025-06-18 spec requires it (RequestIdSchema.optional() vs requestId: RequestId).
   spec = sdk;
 }
 function checkLoggingLevel(
