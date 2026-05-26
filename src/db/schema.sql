@@ -370,6 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_feedback_agent ON agent_feedback(agent_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_outcome ON agent_feedback(outcome);
 CREATE INDEX IF NOT EXISTS idx_feedback_session ON agent_feedback(session_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_recorded ON agent_feedback(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_agent_tool_time ON agent_feedback(agent_id, tool_name, recorded_at);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- VIEWS (common queries as views for convenience)

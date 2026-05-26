@@ -33,6 +33,15 @@ export const MIGRATIONS: Migration[] = [
     ];
     for (const s of statements) db.prepare(s).run();
   } },
+  // Add composite routing index on agent_feedback for the devlog_feedback_route read path.
+  // Without this index, the Wilson-bound + decay query performs a full scan per tool
+  // group (BUG-12). Statements run individually — NOT db.exec — consistent with v2.
+  { version: 3, description: 'agent_feedback composite routing index (BUG-12)', up: (db) => {
+    const statements = [
+      `CREATE INDEX IF NOT EXISTS idx_feedback_agent_tool_time ON agent_feedback(agent_id, tool_name, recorded_at)`,
+    ];
+    for (const s of statements) db.prepare(s).run();
+  } },
 ];
 
 export function runMigrations(db: Database.Database): void {
