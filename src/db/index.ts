@@ -483,10 +483,19 @@ export async function searchDocs(
   }
 
   // Text search (simple LIKE for now, FTS5 can be added later)
+  // Escape LIKE special chars so a query containing '%' or '_' is treated as a
+  // literal character rather than a wildcard.  '\' is the escape char itself.
   if (options.query) {
-    const searchPattern = `%${options.query}%`;
+    const escaped = options.query
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_');
+    const searchPattern = `%${escaped}%`;
     conditions.push(
-      or(like(schema.docs.title, searchPattern), like(schema.docs.content, searchPattern)) as ReturnType<typeof eq>
+      or(
+        sql`${schema.docs.title} LIKE ${searchPattern} ESCAPE '\\'`,
+        sql`${schema.docs.content} LIKE ${searchPattern} ESCAPE '\\'`,
+      ) as ReturnType<typeof eq>
     );
   }
 
