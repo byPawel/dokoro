@@ -157,12 +157,18 @@ export function getSqliteDb(config: DevlogDbConfig): Database.Database {
 
   // If already cached, return the raw sqlite handle
   if (dbConnections.has(dbPath)) {
-    return dbConnections.get(dbPath)!.sqlite;
+    const sqlite = dbConnections.get(dbPath)!.sqlite;
+    // foreign_keys is a per-connection PRAGMA; re-assert it on every handout so
+    // raw-handle callers can never operate with FK enforcement OFF (BUG-13).
+    sqlite.pragma("foreign_keys = ON");
+    return sqlite;
   }
 
   // Initialize via getDb (which caches both drizzle + sqlite)
   getDb(config);
-  return dbConnections.get(dbPath)!.sqlite;
+  const sqlite = dbConnections.get(dbPath)!.sqlite;
+  sqlite.pragma("foreign_keys = ON");
+  return sqlite;
 }
 
 /**
