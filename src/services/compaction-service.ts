@@ -79,6 +79,9 @@ export class CompactionService {
       `[${i + 1}/${summaries.length}] (${s.ai_model}, ~${s.token_count} tokens): ${s.summary}`
     ).join('\n\n');
 
+    // Collect the exact ids of the source rows to delete after merge.
+    const sourceIds = summaries.map((s) => s.id);
+
     const txn = this.db.transaction(() => {
       this.db.prepare(
         'UPDATE sessions SET summary = ? WHERE id = ?'
@@ -97,6 +100,16 @@ export class CompactionService {
       this.db.prepare(
         'UPDATE sessions SET metadata_json = ? WHERE id = ?'
       ).run(JSON.stringify(meta), sessionId);
+
+      // DELETE the exact source rows that were merged so they don't accumulate.
+      // Uses parameterised placeholders (one ? per id) to stay in the
+      // db.prepare().run() pattern (no db.exec).
+      if (sourceIds.length > 0) {
+        const placeholders = sourceIds.map(() => '?').join(',');
+        this.db.prepare(
+          `DELETE FROM conversation_summaries WHERE id IN (${placeholders})`
+        ).run(...sourceIds);
+      }
     });
 
     txn();

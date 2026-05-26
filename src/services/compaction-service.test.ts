@@ -75,6 +75,52 @@ describe('CompactionService', () => {
     expect(meta.compactionPending).toBeFalsy();
   });
 
+  test('compact deletes merged source summaries to bound growth (BUG-22)', async () => {
+    db.prepare('INSERT INTO sessions (id, status) VALUES (?, ?)').run('s-del', 'active');
+    const insert = db.prepare(`
+      INSERT INTO conversation_summaries (session_id, ai_model, summary, token_count, started_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    insert.run('s-del', 'claude', 'Summary A', 10000, new Date(Date.now() - 3000).toISOString());
+    insert.run('s-del', 'claude', 'Summary B', 10000, new Date(Date.now() - 2000).toISOString());
+    insert.run('s-del', 'claude', 'Summary C', 10000, new Date(Date.now() - 1000).toISOString());
+
+    const countBefore = (db.prepare(
+      'SELECT COUNT(*) c FROM conversation_summaries WHERE session_id = ?'
+    ).get('s-del') as { c: number }).c;
+    expect(countBefore).toBe(3);
+
+    await service.compact('s-del');
+
+    // All 3 source rows must be gone.
+    const countAfter = (db.prepare(
+      'SELECT COUNT(*) c FROM conversation_summaries WHERE session_id = ?'
+    ).get('s-del') as { c: number }).c;
+    expect(countAfter).toBe(0);
+
+    // The merged text must be stored on the session row.
+    const session = db.prepare('SELECT summary FROM sessions WHERE id = ?')
+      .get('s-del') as { summary: string };
+    expect(session.summary).toMatch(/Summary A/);
+    expect(session.summary).toMatch(/Summary B/);
+    expect(session.summary).toMatch(/Summary C/);
+  });
+
+  test('compact with no summaries is a no-op (empty session)', async () => {
+    db.prepare('INSERT INTO sessions (id, status) VALUES (?, ?)').run('s-empty', 'active');
+
+    // Should not throw.
+    await expect(service.compact('s-empty')).resolves.toMatchObject({
+      compactedSummaries: 0,
+      compactedTokens: 0,
+    });
+
+    const count = (db.prepare(
+      'SELECT COUNT(*) c FROM conversation_summaries WHERE session_id = ?'
+    ).get('s-empty') as { c: number }).c;
+    expect(count).toBe(0);
+  });
+
   test('recoverPending returns sessions with pending compaction', () => {
     db.prepare('INSERT INTO sessions (id, status, metadata_json) VALUES (?, ?, ?)').run(
       's1', 'active', JSON.stringify({ compactionPending: true })
