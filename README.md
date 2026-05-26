@@ -122,7 +122,7 @@ Plus: **hybrid search** (SQLite FTS5 + LanceDB vectors via Reciprocal Rank Fusio
  2. ORIENT      entity_graph · plan_status             (read semantic + procedural)
  3. ACT         workspace_claim · session_log          (write working)
  4. REFLECT     feedback_record                        (write affective)
- 5. ROUTE       feedback_query                         (read affective)  ──┐
+ 5. ROUTE       feedback_route                         (read affective)  ──┐
  6. PERSIST     workspace_dump                          (write → episodic) │
    │                                                                       │
    └───────────────────────────────────────────────────────────────────◄─┘
