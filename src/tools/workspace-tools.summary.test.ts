@@ -16,6 +16,17 @@ jest.mock('../utils/render-output.js', () => ({
 }));
 jest.mock('../utils/color-setup.js', () => ({}));
 
+// Deterministic, offline embedder — session_summary_add / session_recall call
+// EmbeddingService; without this mock the test makes a real network call to
+// Ollama, which hangs on hosts that drop (rather than refuse) the connection.
+jest.mock('../services/vector-service.js', () => ({
+  EmbeddingService: class {
+    async embed(): Promise<{ embedding: number[]; tokenCount: number }> {
+      return { embedding: [1, 0, 0], tokenCount: 1 };
+    }
+  },
+}));
+
 // Import after mock is registered (require style matches recall.test.ts)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { workspaceTools } = require('./workspace-tools.js') as typeof import('./workspace-tools.js');
