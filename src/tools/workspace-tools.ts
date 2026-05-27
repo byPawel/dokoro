@@ -28,6 +28,7 @@ import {
   calculateDuration
 } from '../utils/session-metadata.js';
 import { enableToolTracking, disableToolTracking, flushToolTracking } from '../utils/tool-tracker.js';
+import { CompactionService } from '../services/compaction-service.js';
 import { startHeartbeat, stopHeartbeat } from '../utils/heartbeat-manager.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
@@ -611,7 +612,16 @@ export const workspaceTools: ToolDefinition[] = [
           a.message_count ?? null,
           a.token_count ?? null,
         );
-        return { content: [{ type: 'text' as const, text: `summary recorded for session ${a.session_id}` }] };
+
+        // Episodic compaction: once cumulative summary tokens exceed the
+        // threshold, merge this session's summaries into sessions.summary.
+        const compactor = new CompactionService(db());
+        let note = '';
+        if (compactor.needsCompaction(a.session_id)) {
+          const res = await compactor.compact(a.session_id);
+          note = ` (compacted ${res.compactedSummaries} summaries, ~${res.compactedTokens} tokens)`;
+        }
+        return { content: [{ type: 'text' as const, text: `summary recorded for session ${a.session_id}${note}` }] };
       } catch (e) {
         return {
           isError: true,
