@@ -32,7 +32,7 @@ npm run dev:core     # Run the core server in watch mode (also: dev:search, dev:
 - `/src/services`: Entity extraction (regex + Ollama LLM), embeddings, vector indexing
 - `/src/utils`, `/src/types`, `/src/shared`: Helpers, type definitions, shared constants
 - Tests live alongside source as `*.test.ts`
-- Node.js >= 18 required
+- Node.js >= 22 required
 
 ## Tools by memory layer
 

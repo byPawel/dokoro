@@ -8,7 +8,7 @@ A multi-layer **agent memory** MCP server: a persistent brain for your LLM agent
 Remember what you're doing, what you did, what you know, and **how well each tool actually performs** — across sessions, models, and projects.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-43853d.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-43853d.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![Built on MCP](https://img.shields.io/badge/built%20on-MCP%20TypeScript%20SDK-orange.svg)](https://github.com/modelcontextprotocol/typescript-sdk)
 
