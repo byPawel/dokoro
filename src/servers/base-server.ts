@@ -9,6 +9,9 @@ import { ToolDefinition, registerTools } from '../tools/registry.js';
 import { withToolTracking } from '../utils/tool-tracker.js';
 import { DEVLOG_PATH } from '../shared/devlog-utils.js';
 import { promises as fs } from 'fs';
+import path from 'node:path';
+import { getSqliteDb } from '../db/index.js';
+import { CompactionService } from '../services/compaction-service.js';
 
 export interface ServerConfig {
   name: string;
@@ -61,6 +64,17 @@ export async function startServer(server: McpServer, tools: ToolDefinition[], co
     console.error('   Run "devlog_init" to create devlog structure.');
     console.error('   Current path:', DEVLOG_PATH);
   } else {
+    // Crash recovery: re-compact any sessions left mid-compaction at last exit.
+    try {
+      const projectPath = path.dirname(DEVLOG_PATH);
+      const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+      const recovered = await new CompactionService(sqlite).recoverAll();
+      if (recovered.length) {
+        console.error(`   Recovered ${recovered.length} pending compaction(s).`);
+      }
+    } catch (e) {
+      console.error('   Compaction recovery skipped:', (e as Error).message);
+    }
     console.error(`✅ ${config.name} v${config.version} running...`);
     console.error('   DevLog path:', DEVLOG_PATH);
   }

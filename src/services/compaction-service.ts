@@ -133,4 +133,16 @@ export class CompactionService {
     `).all() as { id: string }[];
     return pending.map(p => p.id);
   }
+
+  /**
+   * Re-compact every session that was mid-compaction at last exit.
+   * Returns the list of session ids that were recovered.
+   */
+  async recoverAll(): Promise<string[]> {
+    const pending = this.recoverPending();
+    for (const sessionId of pending) {
+      await this.compact(sessionId);
+    }
+    return pending;
+  }
 }
