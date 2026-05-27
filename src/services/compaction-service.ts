@@ -5,6 +5,7 @@
  * Uses pre-flush durability writes to prevent data loss on crash.
  */
 import Database from 'better-sqlite3';
+import { ensureCompactedColumn } from '../db/episodic-tables.js';
 
 const DEFAULT_TOKEN_THRESHOLD = 40000;
 
@@ -21,6 +22,7 @@ export class CompactionService {
   constructor(db: Database.Database, tokenThreshold = DEFAULT_TOKEN_THRESHOLD) {
     this.db = db;
     this.tokenThreshold = tokenThreshold;
+    ensureCompactedColumn(db);
   }
 
   /**
@@ -29,7 +31,8 @@ export class CompactionService {
   needsCompaction(sessionId: string): boolean {
     const row = this.db.prepare(`
       SELECT COALESCE(SUM(token_count), 0) as total_tokens
-      FROM conversation_summaries WHERE session_id = ?
+      FROM conversation_summaries
+      WHERE session_id = ? AND COALESCE(compacted, 0) = 0
     `).get(sessionId) as { total_tokens: number };
     return row.total_tokens > this.tokenThreshold;
   }
@@ -124,6 +127,17 @@ export class CompactionService {
           `DELETE FROM conversation_summaries WHERE id IN (${placeholders})`
         ).run(...sourceIds);
       }
+
+      // Retain the consolidated history as ONE compacted row so it stays in the
+      // recall corpus (devlog_session_recall reads conversation_summaries).
+      // compacted=1 keeps it out of needsCompaction's trigger, so it never
+      // self-retriggers; a later batch of summaries folds this row back in.
+      const latestStartedAt = summaries[summaries.length - 1].started_at;
+      this.db.prepare(`
+        INSERT INTO conversation_summaries
+          (session_id, ai_model, summary, token_count, started_at, compacted)
+        VALUES (?, 'compaction', ?, ?, ?, 1)
+      `).run(sessionId, compacted, totalTokens, latestStartedAt);
     });
 
     txn();

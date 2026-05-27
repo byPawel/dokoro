@@ -53,7 +53,7 @@ Claude ▸ [calls devlog_session_recall { query: "login", since: "2026-05-12" }]
          Resuming from Monday's session — writing the regression test now.
 ```
 
-Summaries are written at session end with `devlog_session_summary_add` (and tool outcomes are auto-captured along the way). `devlog_session_recall` then returns the matching episodic summaries (filtered by `query` substring and an ISO `since` bound) as compact text the agent reads directly:
+Summaries are written at session end with `devlog_session_summary_add` (and tool outcomes are auto-captured along the way). `devlog_session_recall` then returns the matching episodic summaries — narrowed by `query` substring and an ISO `since` bound, then semantically re-ranked by embedding similarity (falling back to recency when offline) — as compact text the agent reads directly. Long sessions are auto-compacted once their summaries grow past the token budget; the consolidated summary is retained as a single recallable entry, so nothing drops out of recall:
 
 ```
 [2026-05-19T14:32:00Z] session=2026-05-19-login model=claude-opus-4-7 msgs=42

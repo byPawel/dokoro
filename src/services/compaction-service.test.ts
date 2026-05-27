@@ -45,6 +45,16 @@ describe('CompactionService', () => {
     expect(service.needsCompaction('s1')).toBe(true);
   });
 
+  test('needsCompaction ignores already-compacted rows (no self-retrigger)', () => {
+    db.prepare('INSERT INTO sessions (id, status) VALUES (?, ?)').run('s1', 'active');
+    // A single compacted row larger than the threshold must NOT trigger.
+    db.prepare(`
+      INSERT INTO conversation_summaries (session_id, ai_model, summary, token_count, started_at, compacted)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `).run('s1', 'compaction', 'merged history', 99999, new Date().toISOString());
+    expect(service.needsCompaction('s1')).toBe(false);
+  });
+
   test('preFlush writes pending state before compaction', () => {
     db.prepare('INSERT INTO sessions (id, status) VALUES (?, ?)').run('s1', 'active');
     service.preFlush('s1');
@@ -92,18 +102,48 @@ describe('CompactionService', () => {
 
     await service.compact('s-del');
 
-    // All 3 source rows must be gone.
-    const countAfter = (db.prepare(
-      'SELECT COUNT(*) c FROM conversation_summaries WHERE session_id = ?'
-    ).get('s-del') as { c: number }).c;
-    expect(countAfter).toBe(0);
+    // The 3 source rows are merged into exactly ONE retained compacted row
+    // (growth bounded), which stays in the recall corpus.
+    const rows = db.prepare(
+      'SELECT summary, compacted FROM conversation_summaries WHERE session_id = ?'
+    ).all('s-del') as Array<{ summary: string; compacted: number }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].compacted).toBe(1);
+    expect(rows[0].summary).toMatch(/Summary A/);
+    expect(rows[0].summary).toMatch(/Summary B/);
+    expect(rows[0].summary).toMatch(/Summary C/);
 
-    // The merged text must be stored on the session row.
+    // The merged text must also be stored on the session row.
     const session = db.prepare('SELECT summary FROM sessions WHERE id = ?')
       .get('s-del') as { summary: string };
     expect(session.summary).toMatch(/Summary A/);
-    expect(session.summary).toMatch(/Summary B/);
     expect(session.summary).toMatch(/Summary C/);
+
+    // And the retained compacted row must NOT re-trigger compaction.
+    expect(service.needsCompaction('s-del')).toBe(false);
+  });
+
+  test('re-compaction folds the prior merged row into a new single row', async () => {
+    db.prepare('INSERT INTO sessions (id, status) VALUES (?, ?)').run('s-fold', 'active');
+    const insert = db.prepare(`
+      INSERT INTO conversation_summaries (session_id, ai_model, summary, token_count, started_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    insert.run('s-fold', 'claude', 'first batch', 45000, '2026-01-01T00:00:00Z');
+    await service.compact('s-fold'); // -> 1 compacted row
+
+    // New summaries pile on top and exceed the threshold again.
+    insert.run('s-fold', 'claude', 'second batch', 45000, '2026-02-01T00:00:00Z');
+    expect(service.needsCompaction('s-fold')).toBe(true);
+    await service.compact('s-fold');
+
+    const rows = db.prepare(
+      'SELECT summary, compacted FROM conversation_summaries WHERE session_id = ?'
+    ).all('s-fold') as Array<{ summary: string; compacted: number }>;
+    expect(rows).toHaveLength(1); // prior merged row folded in
+    expect(rows[0].summary).toMatch(/first batch/);
+    expect(rows[0].summary).toMatch(/second batch/);
+    expect(service.needsCompaction('s-fold')).toBe(false);
   });
 
   test('compact with no summaries is a no-op (empty session)', async () => {

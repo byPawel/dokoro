@@ -65,16 +65,33 @@ describe('session_summary_add auto-compaction', () => {
       });
     }
 
-    const remaining = db
-      .prepare('SELECT COUNT(*) AS n FROM conversation_summaries WHERE session_id = ?')
-      .get('s1') as { n: number };
+    // Source rows are merged into exactly ONE retained compacted row that stays
+    // in the recall corpus (compacted=1 keeps it out of the compaction trigger).
+    const rows = db
+      .prepare('SELECT summary, compacted FROM conversation_summaries WHERE session_id = ?')
+      .all('s1') as Array<{ summary: string; compacted: number }>;
     const session = db
       .prepare('SELECT summary FROM sessions WHERE id = ?')
       .get('s1') as { summary: string | null };
 
-    expect(remaining.n).toBe(0); // source rows merged away
-    expect(session.summary).toContain('chunk 1'); // collapsed into sessions.summary
+    expect(rows).toHaveLength(1);
+    expect(rows[0].compacted).toBe(1);
+    expect(rows[0].summary).toContain('chunk 1');
+    expect(rows[0].summary).toContain('chunk 2');
+    expect(session.summary).toContain('chunk 1'); // also mirrored onto the session row
     expect(session.summary).toContain('chunk 2');
+  });
+
+  it('session_recall surfaces compacted history', async () => {
+    const recall = workspaceTools.find((t: { name: string }) => t.name === 'devlog_session_recall')!;
+    for (const i of [1, 2]) {
+      await summaryAdd.handler({ session_id: 's1', ai_model: 'opus', summary: `chunk ${i}`, token_count: 25000 });
+    }
+    // Auto-compaction fired (50k > 40k); the merged row must still be recallable.
+    const res = await recall.handler({ query: 'chunk' });
+    const text = (res.content[0] as { text: string }).text;
+    expect(text).toContain('chunk 1');
+    expect(text).toContain('chunk 2');
   });
 
   it('does NOT compact below the threshold', async () => {
