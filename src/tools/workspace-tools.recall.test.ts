@@ -110,4 +110,24 @@ describe('devlog_session_recall', () => {
     const text = res.content?.[0]?.type === 'text' ? res.content[0].text : '';
     expect(text.indexOf('about caching')).toBeLessThan(text.indexOf('about databases'));
   });
+
+  it('surfaces an older semantically-relevant summary outside the recency window', async () => {
+    const blob = (v: number[]) => Buffer.from(new Float64Array(v).buffer);
+    const ins = db.prepare(
+      `INSERT INTO conversation_summaries (session_id, ai_model, summary, started_at, summary_embedding) VALUES (?,?,?,?,?)`,
+    );
+    // 11 RECENT but semantically-irrelevant rows ([0,1,0], orthogonal to query [1,0,0]).
+    for (let i = 0; i < 11; i++) {
+      ins.run(`noise${i}`, 'opus', `about noise ${i}`, `2026-03-${10 + i}T00:00:00Z`, blob([0, 1, 0]));
+    }
+    // 1 OLD but highly-relevant row ([1,0,0] == query). With limit=5 and recency-first
+    // truncation this would be dropped before ranking; correct semantic recall keeps it.
+    ins.run('gold', 'opus', 'about caching internals', '2026-01-01T00:00:00Z', blob([1, 0, 0]));
+
+    const tool = workspaceTools.find((t: { name: string }) => t.name === 'devlog_session_recall');
+    const res = await tool!.handler({ query: 'about', limit: 5 });
+    const text = res.content?.[0]?.type === 'text' ? res.content[0].text : '';
+    expect(text).toContain('about caching internals'); // not lost to the recency window
+    expect(text.indexOf('about caching internals')).toBe(text.indexOf('about')); // ranked first
+  });
 });

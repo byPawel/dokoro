@@ -665,13 +665,19 @@ export const workspaceTools: ToolDefinition[] = [
         const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
         ensureEpisodicEmbeddingColumn(db());
+        const userLimit = a.limit ?? 10;
+        // With a query we semantically re-rank, so the recency LIMIT must NOT
+        // truncate candidates first — otherwise a relevant older summary outside
+        // the recency window is lost. Pull a bounded wider pool, rank, then slice.
+        const RANK_CANDIDATE_CAP = 500;
+        const fetchLimit = a.query ? Math.max(userLimit, RANK_CANDIDATE_CAP) : userLimit;
         const rows = db().prepare(`
           SELECT session_id, ai_model, summary, message_count, token_count, started_at, ended_at, summary_embedding
           FROM conversation_summaries
           ${whereSql}
           ORDER BY started_at DESC
           LIMIT ?
-        `).all(...params, a.limit ?? 10) as Array<Record<string, unknown>>;
+        `).all(...params, fetchLimit) as Array<Record<string, unknown>>;
 
         // Semantic re-rank when a query is provided and embeds successfully;
         // otherwise keep the recency order from the SQL above.
@@ -691,6 +697,8 @@ export const workspaceTools: ToolDefinition[] = [
             }
           } catch { /* keep recency order on embed failure */ }
         }
+        // Apply the user-facing limit AFTER ranking (recency path already capped).
+        ordered = ordered.slice(0, userLimit);
 
         const text = ordered.map((r) =>
           `[${r['started_at']}] session=${r['session_id']} model=${r['ai_model']} msgs=${r['message_count']}\n  ${r['summary']}`
