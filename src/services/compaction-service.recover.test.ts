@@ -33,3 +33,23 @@ it('recoverAll re-compacts every session left mid-compaction', async () => {
   expect(session.summary).toContain('orphaned chunk');
   expect(JSON.parse(session.metadata_json).compactionPending).toBeUndefined();
 });
+
+it('does not overwrite an existing summary when no source rows remain', async () => {
+  const db = makeDb();
+  // Stale pending flag, prior compacted summary present, but the source rows
+  // were already removed — compaction must NOT clobber the summary with ''.
+  db.prepare('INSERT INTO sessions (id, summary, metadata_json) VALUES (?, ?, ?)').run(
+    's1',
+    'previously compacted history',
+    JSON.stringify({ compactionPending: true }),
+  );
+
+  const recovered = await new CompactionService(db).recoverAll();
+
+  expect(recovered).toEqual(['s1']);
+  const session = db
+    .prepare('SELECT summary, metadata_json FROM sessions WHERE id = ?')
+    .get('s1') as { summary: string; metadata_json: string };
+  expect(session.summary).toBe('previously compacted history'); // untouched
+  expect(JSON.parse(session.metadata_json).compactionPending).toBeUndefined();
+});

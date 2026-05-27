@@ -1,6 +1,11 @@
 import Database from 'better-sqlite3';
 import { ensureEntityTables } from '../db/entity-tables.js';
-import { EntityPersistence, FUNCTIONAL_RELATION_TYPES } from './entity-extractor.js';
+import {
+  EntityExtractor,
+  RelationDetector,
+  EntityPersistence,
+  FUNCTIONAL_RELATION_TYPES,
+} from './entity-extractor.js';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
@@ -14,6 +19,18 @@ function makeDb(): Database.Database {
 
 it('registers superseded_by as a functional relation', () => {
   expect(FUNCTIONAL_RELATION_TYPES.has('superseded_by')).toBe(true);
+});
+
+it('extracts "X replaced by Y" as X superseded_by Y (not inverted)', () => {
+  const extractor = new EntityExtractor();
+  const detector = new RelationDetector();
+  const text = 'AuthService replaced by AuthV2';
+  const entities = extractor.extractEntities(text);
+  const sup = detector.detectRelations(text, entities).filter((r) => r.relationType === 'superseded_by');
+  expect(sup.length).toBeGreaterThanOrEqual(1);
+  // The superseded entity (AuthService) must be the SOURCE, successor the TARGET.
+  expect(sup[0].sourceCanonical).toBe('authservice');
+  expect(sup[0].targetCanonical).toBe('authv2');
 });
 
 it('closes the prior superseded_by window when the successor changes', () => {
