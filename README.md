@@ -312,14 +312,14 @@ ollama serve            # runs as a background service on most platforms
 ### The agentic loop it enables
 
 ```
-        ┌─────────────────────────────────────────────────────────────┐
-        ▼                                                             │
- tachibot reasons / researches / plans  (multi-model)                │
-        │                                                             │
-        ├─ bridge_index_research ─▶ devlog semantic memory (LanceDB)  │
-        ├─ bridge_import_plan ────▶ devlog procedural memory (plans)  │
-        │                                                             │
- next task: bridge_get_context ◀── devlog recalls what's relevant ───┘
+  ┌────────────────────────────────────────────────────────────────────┐
+  ▼                                                                    │
+  tachibot reasons / researches / plans  (multi-model)                 │
+  │                                                                    │
+  ├─ bridge_index_research  ─▶  devlog semantic memory (LanceDB)       │
+  ├─ bridge_import_plan     ─▶  devlog procedural memory (plans)       │
+  │                                                                    │
+  next task: bridge_get_context  ◀──  devlog recalls what’s relevant ──┘
 ```
 
 The agent stops re-researching what it already looked up and stops re-planning what it already scoped. Each model's output compounds into shared, queryable memory — and because devlog also tracks the affective layer (per-tool/per-agent success rates), the agent can even learn *which model* to route a given kind of task to.
