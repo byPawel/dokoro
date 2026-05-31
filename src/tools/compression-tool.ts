@@ -1,5 +1,5 @@
 /**
- * Devlog compression tool with ChromaDB integration
+ * Devlog compression tool
  * Consolidates daily files into weekly summaries
  */
 
@@ -27,7 +27,7 @@ interface SessionData {
 export const compressionTool: ToolDefinition = {
   name: 'devlog_compress_week',
   title: 'Compress Weekly Sessions',
-  description: 'Compress daily session files into weekly summary and update ChromaDB',
+  description: 'Compress daily session files into weekly summary',
   inputSchema: {
     weekNumber: z.number().optional().describe('Week number to compress (defaults to last week)'),
     year: z.number().optional().describe('Year (defaults to current year)'),
@@ -97,9 +97,6 @@ export const compressionTool: ToolDefinition = {
         await fs.rename(file, archivePath);
       }
       
-      // Update ChromaDB index
-      const chromadbUpdateCmd = `python /Users/gravity/Documents/WORK/atlassian/bulk/Magic-Bulk-Ai/scripts/index-devlog.py --reindex`;
-      
       return {
         content: [{
           type: 'text',
@@ -112,8 +109,6 @@ export const compressionTool: ToolDefinition = {
             `📁 Files:\n` +
             `- Weekly summary: ${path.relative(DEVLOG_PATH, weeklyFile)}\n` +
             `- Archived to: ${path.relative(DEVLOG_PATH, archiveDir)}/\n\n` +
-            `🔄 ChromaDB Update:\n` +
-            `Run: ${chromadbUpdateCmd}\n\n` +
             `💡 The weekly summary is now the primary search target.\n` +
             `Original files are preserved in archive for reference.`
         }]
