@@ -361,8 +361,7 @@ devlog-mcp/
 │   ├── db/               # SQLite schema, migrations, Drizzle models
 │   ├── utils/            # Utility functions
 │   └── types/            # TypeScript type definitions
-├── docs/                 # Architecture notes and plans
-└── examples/             # Usage examples
+└── docs/                 # Architecture notes and plans
 ```
 
 ---
@@ -373,6 +372,5 @@ devlog-mcp/
 
 ## Acknowledgments
 
-- Built on the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) by Anthropic.
-- Original SDK © 2024 Anthropic, PBC — MIT License.
+- Depends on the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) (`@modelcontextprotocol/sdk`) by Anthropic, used under its MIT License.
 - Thanks to the Anthropic team for creating the Model Context Protocol.
