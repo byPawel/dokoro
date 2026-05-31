@@ -13,7 +13,6 @@ import { DEVLOG_PATH } from './shared/devlog-utils.js';
 // Initialize the MCP server
 const server = new McpServer({
   name: 'mcp-devlog',
-  vendor: 'turbowizard',
   version: '2.0.0',
   description: 'DevLog MCP server for development insights and test tracking'
 }, {
@@ -65,12 +64,14 @@ async function searchDevlogs(query: string, type: string = 'all') {
 server.tool(
   'search_devlogs',
   'Search across all devlog entries',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   {
     query: z.string().describe('Search query'),
     type: z.enum(['posts', 'ideas', 'features', 'all']).optional().default('all'),
     limit: z.number().optional().default(10),
-  },
-  async ({ query, type, limit }): Promise<CallToolResult> => {
+  } as any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ query, type, limit }: any): Promise<CallToolResult> => {
     const results = await searchDevlogs(query, type);
     const limited = results.slice(0, limit);
     
@@ -89,11 +90,13 @@ server.tool(
 server.tool(
   'list_recent_devlogs',
   'List recently modified devlog entries',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   {
     days: z.number().optional().default(7).describe('Number of days to look back'),
     type: z.enum(['posts', 'ideas', 'features', 'all']).optional().default('all'),
-  },
-  async ({ days, type }): Promise<CallToolResult> => {
+  } as any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ days, type }: any): Promise<CallToolResult> => {
     const patterns: Record<string, string> = {
       posts: 'posts/**/*.md',
       ideas: 'ideas-to-verify/**/*.md',
@@ -134,10 +137,12 @@ server.tool(
 server.tool(
   'analyze_feature_history',
   'Get the development history of a specific feature',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   {
     featureName: z.string().describe('Name of the feature to analyze'),
-  },
-  async ({ featureName }): Promise<CallToolResult> => {
+  } as any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ featureName }: any): Promise<CallToolResult> => {
     const results = await searchDevlogs(featureName);
     
     // Group by type
@@ -168,11 +173,13 @@ server.registerPrompt(
   {
     title: 'DevLog Summary',
     description: 'Generate a summary of recent development activities',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     argsSchema: {
       days: z.string().optional().describe('Number of days to analyze'),
-    },
+    } as any,
   },
-  async ({ days = '7' }): Promise<GetPromptResult> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ days = '7' }: any): Promise<GetPromptResult> => {
     const numDays = parseInt(days, 10);
     return {
       messages: [
@@ -199,11 +206,13 @@ server.registerPrompt(
   {
     title: 'Test Coverage Analysis',
     description: 'Analyze which features need more testing',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     argsSchema: {
       feature: z.string().optional().describe('Specific feature to analyze'),
-    },
+    } as any,
   },
-  async ({ feature }): Promise<GetPromptResult> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ feature }: any): Promise<GetPromptResult> => {
     const featureClause = feature ? ` for the "${feature}" feature` : '';
     return {
       messages: [
@@ -230,11 +239,13 @@ server.registerPrompt(
   {
     title: 'Development Velocity',
     description: 'Analyze development pace and patterns',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     argsSchema: {
       period: z.enum(['week', 'month']).optional().describe('Period to analyze'),
-    },
+    } as any,
   },
-  async ({ period = 'week' }): Promise<GetPromptResult> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ period = 'week' }: any): Promise<GetPromptResult> => {
     const days = period === 'week' ? 7 : 30;
     return {
       messages: [

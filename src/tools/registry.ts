@@ -20,7 +20,8 @@ export function registerTool(server: McpServer, tool: ToolDefinition) {
     {
       title: tool.title,
       description: tool.description,
-      inputSchema: tool.inputSchema,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      inputSchema: tool.inputSchema as any,
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tool.handler as any

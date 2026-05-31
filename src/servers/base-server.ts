@@ -17,13 +17,11 @@ export interface ServerConfig {
   name: string;
   version: string;
   description: string;
-  vendor?: string;
 }
 
 export function createDevlogServer(config: ServerConfig): McpServer {
   const server = new McpServer({
     name: config.name,
-    vendor: config.vendor || 'turbowizard',
     version: config.version,
     description: config.description
   }, {

@@ -55,7 +55,6 @@ async function searchDevlogs(query: string, type: string = 'all') {
 const getDevLogServer = () => {
   const server = new McpServer({
     name: 'mcp-devlog-http',
-    vendor: 'turbowizard',
     version: '2.0.0',
     description: 'DevLog MCP server (HTTP mode) for development insights'
   }, {
@@ -72,13 +71,15 @@ const getDevLogServer = () => {
     {
       title: 'Search DevLogs',
       description: 'Search across all devlog entries',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       inputSchema: {
         query: z.string().describe('Search query'),
         type: z.enum(['posts', 'ideas', 'features', 'all']).optional().default('all'),
         limit: z.number().optional().default(10),
-      },
+      } as any,
     },
-    async ({ query, type, limit }): Promise<CallToolResult> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async ({ query, type, limit }: any): Promise<CallToolResult> => {
       const results = await searchDevlogs(query, type);
       const limited = results.slice(0, limit);
       
@@ -100,12 +101,14 @@ const getDevLogServer = () => {
     {
       title: 'List Recent DevLogs',
       description: 'List recently modified devlog entries',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       inputSchema: {
         days: z.number().optional().default(7).describe('Number of days to look back'),
         type: z.enum(['posts', 'ideas', 'features', 'all']).optional().default('all'),
-      },
+      } as any,
     },
-    async ({ days, type }): Promise<CallToolResult> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async ({ days, type }: any): Promise<CallToolResult> => {
       const patterns: Record<string, string> = {
         posts: 'posts/**/*.md',
         ideas: 'ideas-to-verify/**/*.md',
@@ -149,11 +152,13 @@ const getDevLogServer = () => {
     {
       title: 'Analyze Feature History',
       description: 'Get the development history of a specific feature',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       inputSchema: {
         featureName: z.string().describe('Name of the feature to analyze'),
-      },
+      } as any,
     },
-    async ({ featureName }): Promise<CallToolResult> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async ({ featureName }: any): Promise<CallToolResult> => {
       const results = await searchDevlogs(featureName);
       
       // Group by type
@@ -184,7 +189,8 @@ const getDevLogServer = () => {
     {
       title: 'Test DevLog Connection',
       description: 'Test if the devlog server is working',
-      inputSchema: {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      inputSchema: {} as any,
     },
     async (): Promise<CallToolResult> => {
       return {

@@ -72,7 +72,7 @@
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.23.0",
-    "@modelcontextprotocol/sdk": "1.17.1",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "ajv": "^6.12.6",
     "apache-arrow": "^18.1.0",
     "better-sqlite3": "^12.6.2",
