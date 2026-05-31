@@ -1,0 +1,46 @@
+devlog-mcp
+Copyright (c) 2026 Pawel Pawlowski
+
+This project is dual-licensed. Two bodies of code live in this repository and
+are governed by two different licenses.
+
+================================================================================
+1. Original devlog-mcp code — GNU AGPL-3.0-or-later  (see LICENSE)
+================================================================================
+All source code authored for devlog-mcp is licensed under the GNU Affero
+General Public License, version 3 or (at your option) any later version.
+
+This covers everything in the repository EXCEPT the vendored MCP TypeScript SDK
+listed in section 2 — in particular the memory-layer implementation:
+
+    src/tools/        src/services/     src/db/          src/servers/
+    src/utils/        src/config/       src/types/
+    src/devlog-cli.ts src/devlog-server.ts                src/devlog-http-server.ts
+    docs/             scripts/          and the project tooling/config
+
+================================================================================
+2. Vendored Model Context Protocol TypeScript SDK — MIT  (see LICENSE-MIT)
+================================================================================
+This repository is a fork of, and vendors portions of, the Model Context
+Protocol TypeScript SDK, Copyright (c) 2024 Anthropic, PBC, originally licensed
+under the MIT License. Those portions remain licensed under the MIT License,
+and Anthropic's copyright and permission notice are retained in LICENSE-MIT in
+compliance with that license.
+
+The vendored SDK portions are:
+
+    src/client/       src/server/       src/shared/      src/examples/
+    src/integration-tests/              src/__mocks__/
+    src/cli.ts        src/inMemory.ts   src/types.ts     src/spec.types.ts
+    (and their co-located *.test.ts files)
+    src/test-client.html                src/test-max-listeners.ts
+
+================================================================================
+SPDX-License-Identifier: AGPL-3.0-or-later AND MIT
+================================================================================
+
+Note: AGPL-3.0 is a network-copyleft license. If you run a modified version of
+the original devlog-mcp code to provide a service over a network, the AGPL
+requires you to offer the corresponding source of your modified version to the
+users of that service. The vendored MIT SDK portions are not subject to that
+requirement.

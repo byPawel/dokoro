@@ -7,7 +7,7 @@
 A multi-layer **agent memory** MCP server: a persistent brain for your LLM agent.
 Remember what you're doing, what you did, what you know, and **how well each tool actually performs** — across sessions, models, and projects.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-43853d.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![Built on MCP](https://img.shields.io/badge/built%20on-MCP%20TypeScript%20SDK-orange.svg)](https://github.com/modelcontextprotocol/typescript-sdk)
@@ -369,10 +369,15 @@ devlog-mcp/
 
 ## License
 
-[MIT](LICENSE) — see the LICENSE file for details.
+**Dual-licensed** — see [`NOTICE`](NOTICE) for the full boundary.
+
+- Original devlog-mcp code (the memory layers, tools, db, services) — **[AGPL-3.0-or-later](LICENSE)**. Note: AGPL is network-copyleft — running a modified version as a network service obliges you to offer its source.
+- Vendored portions of the MCP TypeScript SDK — **[MIT](LICENSE-MIT)**, © 2024 Anthropic, PBC.
+
+SPDX: `AGPL-3.0-or-later AND MIT`.
 
 ## Acknowledgments
 
-- Built on the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) by Anthropic.
-- Original SDK © 2024 Anthropic, PBC — MIT License.
+- Built on (and vendors) the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) by Anthropic.
+- Original SDK © 2024 Anthropic, PBC — MIT License (retained in `LICENSE-MIT`).
 - Thanks to the Anthropic team for creating the Model Context Protocol.

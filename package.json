@@ -2,7 +2,7 @@
   "name": "@devlog-mcp/core",
   "version": "0.1.0",
   "description": "Developer logging and workspace management MCP servers for multiple AI CLIs (based on MCP SDK v1.17.1)",
-  "license": "MIT",
+  "license": "(AGPL-3.0-or-later AND MIT)",
   "author": "Pawel Pawlowski",
   "homepage": "https://github.com/byPawel/devlog-mcp",
   "bugs": "https://github.com/byPawel/devlog-mcp/issues",
