@@ -8,7 +8,7 @@ import path from 'path';
 import { glob } from 'glob';
 import { McpServer } from './server/mcp.js';
 import { StreamableHTTPServerTransport } from './server/streamableHttp.js';
-import { CallToolResult, isInitializeRequest } from './types.js';
+import { CallToolResult, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 // Get devlog path from environment or use default
 const DEVLOG_PATH = process.env.DEVLOG_PATH || path.join(process.cwd(), '..', 'devlog');

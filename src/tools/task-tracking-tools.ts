@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { promises as fs } from 'fs';
 import { ToolDefinition } from './registry.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
 import { extractMetadata, updateMetadata, formatDuration, calculateDuration } from '../utils/session-metadata.js';
 import { renderOutput } from '../utils/render-output.js';

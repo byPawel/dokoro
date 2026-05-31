@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { smartTagger } from './ai-smart-tagger.js';
 import { tagTaxonomy } from './tag-taxonomy.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import matter from 'gray-matter';

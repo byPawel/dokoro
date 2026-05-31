@@ -5,7 +5,7 @@ import path from 'path';
 import { glob } from 'glob';
 import { McpServer } from './server/mcp.js';
 import { StdioServerTransport } from './server/stdio.js';
-import { CallToolResult, GetPromptResult, ReadResourceResult } from './types.js';
+import { CallToolResult, GetPromptResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 // Get devlog path from environment or use default
 import { DEVLOG_PATH } from './shared/devlog-utils.js';

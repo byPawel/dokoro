@@ -4,7 +4,7 @@ import path from 'path';
 import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace, generateAgentId, parseAgentFromContent } from '../utils/workspace.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DEVLOG_PATH } from '../types/devlog.js';
 import { getSqliteDb } from '../db/index.js';
 

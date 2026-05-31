@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { summarizer } from './summarizer.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import matter from 'gray-matter';

@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { similarityDetector } from './similarity-detector.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as path from 'path';
 
 export const similarityTools: ToolDefinition[] = [

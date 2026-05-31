@@ -9,7 +9,7 @@ import * as path from 'path';
 import matter from 'gray-matter';
 import { glob } from 'glob';
 import { z } from 'zod';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 

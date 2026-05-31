@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { readFile, readdir } from 'fs/promises';
 import { join, basename } from 'path';
 import { DEVLOG_PATH } from '../types/devlog.js';

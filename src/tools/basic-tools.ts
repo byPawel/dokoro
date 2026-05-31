@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
 import { DEVLOG_PATH } from '../types/devlog.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 
 export const basicTools: ToolDefinition[] = [

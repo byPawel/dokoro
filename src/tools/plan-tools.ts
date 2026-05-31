@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DEVLOG_PATH } from '../types/devlog.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';

@@ -1,6 +1,6 @@
 import { McpServer } from '../server/mcp.js';
 import { ZodRawShape } from 'zod';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export interface ToolDefinition {
   name: string;

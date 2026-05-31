@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
-import { CallToolResult } from '../types.js';
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DEVLOG_PATH } from '../types/devlog.js';
 // renderOutput available for future migration
 // import { renderOutput } from '../utils/render-output.js';
