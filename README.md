@@ -104,7 +104,7 @@ Every `entity_relations` row carries `valid_from` / `valid_to` (Zep/Graphiti-sty
 - auth/session.ts --[uses]--> jwt-stateless-tokens
 ```
 
-> Once that fact's window is closed, the default "now" view stops returning it — it only surfaces when you ask "as of" a date inside its validity window; the history is never deleted. Window-closing on supersession is active for **single-valued** relations (the set is empty by default — add types to `FUNCTIONAL_RELATION_TYPES` in `entity-extractor.ts` to enable it); genuinely **many-valued** relations like `depends_on` or `implements` accumulate concurrent open facts instead of evicting each other.
+> Once that fact's window is closed, the default "now" view stops returning it — it only surfaces when you ask "as of" a date inside its validity window; the history is never deleted. Window-closing on supersession is active for **single-valued** relations — `FUNCTIONAL_RELATION_TYPES` in `entity-extractor.ts` defaults to `superseded_by`, and you can add more types to extend it; genuinely **many-valued** relations like `depends_on` or `implements` accumulate concurrent open facts instead of evicting each other.
 
 Plus: **hybrid search** (SQLite FTS5 + LanceDB vectors via Reciprocal Rank Fusion) and an **optional local LLM** (Ollama) for embeddings and deep entity extraction — the server runs fine without it, falling back to regex.
 
@@ -177,6 +177,9 @@ Tools are organised by which memory layer they read or write.
 | `devlog_workspace_claim` | Claim workspace with a file-based lock |
 | `devlog_workspace_dump` | Export workspace data (registers docs in SQLite) |
 | `devlog_session_log` | Log development session entries with tags |
+| `devlog_regenerate_current` | Auto-generate or update `current.md` from recent activity |
+| `devlog_update_current_section` | Update a specific section in `current.md` |
+| `devlog_get_current_focus` | Read the current focus and active tasks from `current.md` |
 | `devlog_question_add` | Log a question during development |
 | `devlog_question_answer` | Answer a previously logged question |
 | `devlog_question_list` | List all tracked questions |
@@ -190,7 +193,8 @@ Tools are organised by which memory layer they read or write.
 | Tool | Description |
 |------|-------------|
 | `devlog_session_recall` | Read past session summaries (filter by query, session_id, since timestamp) |
-| `devlog_compress_week` | Generate a compressed weekly summary (sessions, decisions, mermaid charts) |
+| `devlog_session_summary_add` | Write a session summary at session end — the episodic **write** path |
+| `devlog_compress_week` | Generate a compressed weekly summary (sessions, decisions, mermaid charts) — *analytics server only* |
 
 </details>
 
@@ -224,6 +228,7 @@ Tools are organised by which memory layer they read or write.
 | Tool | Description |
 |------|-------------|
 | `devlog_feedback_record` | Record the outcome of a tool call (success / failure / partial / rejected / timeout) with confidence and latency |
+| `devlog_feedback_route` | Ranked track record (Wilson lower bound + recency decay) to bias tool/model routing |
 | `devlog_feedback_query` | Per-tool success rates, recent failures, agent-specific stats |
 
 </details>
@@ -279,9 +284,6 @@ Register the server with Claude:
 ```bash
 # Core server (essential features)
 claude mcp add devlog-core "node" "$(pwd)/dist/servers/core-server.js"
-
-# …or with environment variables
-claude mcp add devlog-core "$(pwd)/../mcp-wrapper.sh" ".env.local" "node" "$(pwd)/dist/servers/core-server.js"
 ```
 
 ### Ollama setup (optional)
