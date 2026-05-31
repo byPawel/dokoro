@@ -1,7 +1,7 @@
 /**
  * LanceDB Semantic Search Tools
  *
- * Replaces chromadb-tools.ts with pure TypeScript LanceDB implementation.
+ * Pure TypeScript LanceDB implementation — the committed vector backend.
  * Uses Ollama nomic-embed-text for embeddings and hybrid FTS5+vector search.
  */
 

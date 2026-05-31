@@ -1,6 +1,6 @@
 /**
  * Backup and recovery tools for issue/feature data integrity
- * Provides ChromaDB sync verification and data recovery capabilities
+ * Provides backup verification and data recovery capabilities
  */
 
 import { z } from 'zod';
@@ -163,44 +163,16 @@ async function getLatestBackup(): Promise<string | null> {
   }
 }
 
-// Simulate ChromaDB sync check (placeholder for actual ChromaDB integration)
-async function checkChromaDBSync(items: BackupItem[]): Promise<{ synced: boolean; missing: string[] }> {
-  // This is a placeholder - in real implementation, this would check ChromaDB
-  // For now, we'll simulate by checking if files exist and are recent
-  const missing: string[] = [];
-  
-  for (const item of items) {
-    try {
-      const stat = await fs.stat(item.file_path);
-      const ageHours = (Date.now() - stat.mtime.getTime()) / (1000 * 60 * 60);
-      
-      // Consider items as "not synced" if they're very recent (< 1 hour)
-      // In real implementation, this would check ChromaDB timestamps
-      if (ageHours < 1) {
-        missing.push(item.id);
-      }
-    } catch {
-      missing.push(item.id);
-    }
-  }
-  
-  return {
-    synced: missing.length === 0,
-    missing
-  };
-}
-
 export const backupRecoveryTools: ToolDefinition[] = [
   {
     name: 'devlog_backup_verify',
     title: 'Verify Backup Status',
-    description: 'Verify ChromaDB sync status and data integrity',
+    description: 'Verify backup status and data integrity',
     inputSchema: {
       create_backup: z.boolean().default(false).describe('Create new backup file'),
-      check_chromadb: z.boolean().default(true).describe('Check ChromaDB sync status'),
     },
-    handler: async (args: { create_backup?: boolean; check_chromadb?: boolean }): Promise<CallToolResult> => {
-      const { create_backup, check_chromadb } = args;
+    handler: async (args: { create_backup?: boolean }): Promise<CallToolResult> => {
+      const { create_backup } = args;
       try {
         // Get all tracking files
         const files = await getAllTrackingFiles();
@@ -254,25 +226,6 @@ export const backupRecoveryTools: ToolDefinition[] = [
           output += `🆕 **Recent Changes** (${recentFiles.length} items updated in last 24h)\n\n`;
         }
         
-        // ChromaDB sync check
-        if (check_chromadb) {
-          const syncResult = await checkChromaDBSync(items);
-          
-          output += `🗄️ **ChromaDB Sync Status**:\n`;
-          if (syncResult.synced) {
-            output += `✅ All items synced\n\n`;
-          } else {
-            output += `⚠️ ${syncResult.missing.length} items need syncing:\n`;
-            for (const id of syncResult.missing.slice(0, 5)) {
-              output += `- ${id}\n`;
-            }
-            if (syncResult.missing.length > 5) {
-              output += `- ... and ${syncResult.missing.length - 5} more\n`;
-            }
-            output += `\n💡 ChromaDB indexing runs automatically during active sessions\n\n`;
-          }
-        }
-        
         // Create backup if requested
         if (create_backup && items.length > 0) {
           const backupPath = await createBackupFile(items);
@@ -294,8 +247,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
         
         output += `🎯 **Quick Actions**:\n`;
         output += `- \`/backup:verify --create_backup\` - Create new backup\n`;
-        output += `- \`/backup:restore\` - Restore from backup if needed\n`;
-        output += `- \`mcp: chromadb_reindex\` - Force ChromaDB reindex`;
+        output += `- \`/backup:restore\` - Restore from backup if needed`;
         
         return {
           content: [
@@ -321,13 +273,13 @@ export const backupRecoveryTools: ToolDefinition[] = [
   {
     name: 'devlog_restore_items',
     title: 'Restore Items from Backup',
-    description: 'Restore issues/features from ChromaDB or backup files',
+    description: 'Restore issues/features from backup files',
     inputSchema: {
       type: z.enum(['all', 'issues', 'features']).default('all').describe('Type of items to restore'),
-      source: z.enum(['backup', 'chromadb', 'auto']).default('auto').describe('Restore source'),
+      source: z.enum(['backup', 'auto']).default('auto').describe('Restore source'),
       dry_run: z.boolean().default(true).describe('Preview restoration without making changes'),
     },
-    handler: async (args: { type?: 'all' | 'issues' | 'features'; source?: 'backup' | 'chromadb' | 'auto'; dry_run?: boolean }): Promise<CallToolResult> => {
+    handler: async (args: { type?: 'all' | 'issues' | 'features'; source?: 'backup' | 'auto'; dry_run?: boolean }): Promise<CallToolResult> => {
       const { type, source, dry_run } = args;
       try {
         let output = `🔄 **Data Restoration${dry_run ? ' Preview' : ''}**\n\n`;
@@ -458,8 +410,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
               output += `\n`;
             }
             
-            output += `💡 Use \`/backup:verify\` to verify restoration\n`;
-            output += `💡 Items are automatically indexed to ChromaDB`;
+            output += `💡 Use \`/backup:verify\` to verify restoration`;
           } else {
             output += `⚠️ **This is a preview** - use \`--dry_run=false\` to actually restore\n\n`;
             output += `🎯 **Next Steps**:\n`;
@@ -467,13 +418,8 @@ export const backupRecoveryTools: ToolDefinition[] = [
             output += `- Run \`/backup:restore --type=${type} --dry_run=false\` to restore\n`;
             output += `- Use \`/backup:verify\` after restoration`;
           }
-        } else {
-          // ChromaDB restore (placeholder)
-          output += `🗄️ **ChromaDB Restoration**\n\n`;
-          output += `⚠️ ChromaDB restoration not yet implemented\n`;
-          output += `💡 Use backup restoration for now: \`--source=backup\``;
         }
-        
+
         return {
           content: [
             {
@@ -498,7 +444,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
   {
     name: 'devlog_health_check',
     title: 'System Health Check',
-    description: 'Check consistency between files, currentWeek.md, and ChromaDB',
+    description: 'Check consistency between files and currentWeek.md',
     inputSchema: {
       fix_issues: z.boolean().default(false).describe('Automatically fix detected issues'),
     },
@@ -638,8 +584,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
         
         output += `🎯 **Maintenance Commands**:\n`;
         output += `- \`/backup:verify --create_backup\` - Create backup\n`;
-        output += `- \`/backup:restore --dry_run\` - Check restore status\n`;
-        output += `- \`mcp: chromadb_reindex\` - Reindex ChromaDB`;
+        output += `- \`/backup:restore --dry_run\` - Check restore status`;
         
         return {
           content: [
