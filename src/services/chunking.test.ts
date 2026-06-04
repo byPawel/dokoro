@@ -1,4 +1,4 @@
-import { ChunkingService } from './vector-service.js';
+import { ChunkingService } from './embedding-service.js';
 
 // Helper: generate lines that exceed the 2000-token (8000 char) whole-file threshold
 // Each line ~115 chars, so 80 lines ~= 9200 chars ~= 2300 tokens (above 2000 threshold)

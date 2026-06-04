@@ -1,4 +1,4 @@
-import { EmbeddingService } from './vector-service.js';
+import { EmbeddingService } from './embedding-service.js';
 
 describe('EmbeddingService timeout', () => {
   const realFetch = globalThis.fetch;

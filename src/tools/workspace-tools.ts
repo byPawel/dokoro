@@ -29,7 +29,7 @@ import {
 } from '../utils/session-metadata.js';
 import { enableToolTracking, disableToolTracking, flushToolTracking } from '../utils/tool-tracker.js';
 import { CompactionService } from '../services/compaction-service.js';
-import { EmbeddingService } from '../services/vector-service.js';
+import { EmbeddingService } from '../services/embedding-service.js';
 import { floatArrayToBlob, blobToFloatArray, cosineSimilarity } from '../utils/vector-math.js';
 import { ensureEpisodicEmbeddingColumn } from '../db/episodic-tables.js';
 import { startHeartbeat, stopHeartbeat } from '../utils/heartbeat-manager.js';

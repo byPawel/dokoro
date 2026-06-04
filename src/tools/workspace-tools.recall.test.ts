@@ -18,7 +18,7 @@ jest.mock('../utils/color-setup.js', () => ({}));
 
 // Deterministic, offline embedder: query always embeds to [1,0,0]. Avoids
 // loading LanceDB and hitting Ollama in tests.
-jest.mock('../services/vector-service.js', () => ({
+jest.mock('../services/embedding-service.js', () => ({
   EmbeddingService: class {
     async embed(): Promise<{ embedding: number[]; tokenCount: number }> {
       return { embedding: [1, 0, 0], tokenCount: 1 };
