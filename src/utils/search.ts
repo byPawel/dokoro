@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { globSync } from 'glob';
 import { parseDevlogContent } from './parsing.js';
-import { SearchResult, DEVLOG_PATH } from '../types/devlog.js';
+import { SearchResult, DOKORO_PATH } from '../types/devlog.js';
 
 /**
  * Read a devlog file
@@ -36,11 +36,11 @@ export async function searchDevlogs(
   };
   
   const pattern = patterns[type] || patterns.all;
-  const files = globSync(pattern, { cwd: DEVLOG_PATH });
+  const files = globSync(pattern, { cwd: DOKORO_PATH });
   
   const results: SearchResult[] = [];
   for (const file of files) {
-    const content = await readDevlogFile(path.join(DEVLOG_PATH, file));
+    const content = await readDevlogFile(path.join(DOKORO_PATH, file));
     if (!content) continue;
     
     const parsed = parseDevlogContent(content);
@@ -79,7 +79,7 @@ export async function searchDevlogs(
       results.push({
         file,
         excerpt: parsed.content.substring(0, 200) + '...',
-        lastModified: (await fs.stat(path.join(DEVLOG_PATH, file))).mtime,
+        lastModified: (await fs.stat(path.join(DOKORO_PATH, file))).mtime,
         fullContent: content,
         parsedContent: parsed.content,
         title: parsed.title,

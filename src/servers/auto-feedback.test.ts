@@ -5,7 +5,7 @@
  * Spec:
  * - wrap a resolving handler → agent_feedback row with outcome='success' and numeric latency_ms
  * - wrap a throwing handler → agent_feedback row with outcome='failure' AND error still propagates
- * - DEVLOG_AUTO_FEEDBACK=false skips recording
+ * - DOKORO_AUTO_FEEDBACK=false skips recording
  */
 import Database from 'better-sqlite3';
 import { jest } from '@jest/globals';
@@ -44,22 +44,22 @@ function setupDb(): Database.Database {
 
 describe('withToolTracking auto-feedback', () => {
   let db: Database.Database;
-  const origEnv = process.env.DEVLOG_AUTO_FEEDBACK;
+  const origEnv = process.env.DOKORO_AUTO_FEEDBACK;
 
   beforeEach(() => {
     db = setupDb();
     (globalThis as Record<string, unknown>).__TEST_DB__ = db;
     // Ensure auto-feedback is enabled by default
-    delete process.env.DEVLOG_AUTO_FEEDBACK;
+    delete process.env.DOKORO_AUTO_FEEDBACK;
   });
 
   afterEach(() => {
     db.close();
     delete (globalThis as Record<string, unknown>).__TEST_DB__;
     if (origEnv !== undefined) {
-      process.env.DEVLOG_AUTO_FEEDBACK = origEnv;
+      process.env.DOKORO_AUTO_FEEDBACK = origEnv;
     } else {
-      delete process.env.DEVLOG_AUTO_FEEDBACK;
+      delete process.env.DOKORO_AUTO_FEEDBACK;
     }
   });
 
@@ -110,8 +110,8 @@ describe('withToolTracking auto-feedback', () => {
     expect(typeof row!.latency_ms).toBe('number');
   });
 
-  it('skips recording when DEVLOG_AUTO_FEEDBACK=false', async () => {
-    process.env.DEVLOG_AUTO_FEEDBACK = 'false';
+  it('skips recording when DOKORO_AUTO_FEEDBACK=false', async () => {
+    process.env.DOKORO_AUTO_FEEDBACK = 'false';
 
     const handler = async (..._args: unknown[]) => ({ content: [{ type: 'text' as const, text: 'ok' }] });
     const tracked = withToolTracking('opt_out_tool', handler);

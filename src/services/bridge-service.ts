@@ -8,7 +8,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import { getSqliteDb, ensureVectorTables } from '../db/index.js';
 import { createVectorServices, type SearchResult } from './vector-service.js';
 
@@ -20,17 +20,17 @@ let vectorServicesInstance: ReturnType<typeof createVectorServices> | null = nul
 
 function getVectorServices() {
   if (!vectorServicesInstance) {
-    const projectPath = path.dirname(DEVLOG_PATH);
-    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+    const projectPath = path.dirname(DOKORO_PATH);
+    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
     ensureVectorTables(sqlite);
-    vectorServicesInstance = createVectorServices(sqlite, path.join(projectPath, path.basename(DEVLOG_PATH)));
+    vectorServicesInstance = createVectorServices(sqlite, path.join(projectPath, path.basename(DOKORO_PATH)));
   }
   return vectorServicesInstance;
 }
 
 function getSqlite() {
-  const projectPath = path.dirname(DEVLOG_PATH);
-  return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+  const projectPath = path.dirname(DOKORO_PATH);
+  return getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -151,7 +151,7 @@ export async function indexResearch(input: IndexResearchInput): Promise<IndexRes
 
 /**
  * Creates a Plan JSON matching plan-tools.ts interface.
- * Writes to DEVLOG_PATH/.mcp/plans/{planId}.json + updates index.json.
+ * Writes to DOKORO_PATH/.mcp/plans/{planId}.json + updates index.json.
  * Imported plans immediately work with dokoro_plan_check, dokoro_plan_validate, etc.
  */
 export async function importPlan(input: ImportPlanInput): Promise<ImportPlanResult> {
@@ -177,7 +177,7 @@ export async function importPlan(input: ImportPlanInput): Promise<ImportPlanResu
   };
 
   // Write plan file
-  const plansDir = path.join(DEVLOG_PATH, '.mcp', 'plans');
+  const plansDir = path.join(DOKORO_PATH, '.mcp', 'plans');
   await fs.mkdir(plansDir, { recursive: true });
 
   const planPath = path.join(plansDir, `${planId}.json`);

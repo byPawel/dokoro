@@ -67,4 +67,4 @@ export interface ResearchSource {
 
 // Environment configuration
 // Re-export from shared utils to ensure single source of truth for path resolution
-export { DEVLOG_PATH } from '../shared/devlog-utils.js';
+export { DOKORO_PATH } from '../shared/devlog-utils.js';

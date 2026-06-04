@@ -10,12 +10,12 @@ import { z } from 'zod';
 import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { getSqliteDb } from '../db/index.js';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import * as path from 'node:path';
 
 function getSqlite(): Database.Database {
-  const projectPath = path.dirname(DEVLOG_PATH);
-  return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+  const projectPath = path.dirname(DOKORO_PATH);
+  return getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
 }
 
 function db(): Database.Database {

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { icon } from '../utils/icons.js';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import { getSqliteDb, ensureVectorTables } from '../db/index.js';
 import { createVectorServices, type SearchResult } from '../services/vector-service.js';
 import * as path from 'node:path';
@@ -19,17 +19,17 @@ let vectorServicesInstance: ReturnType<typeof createVectorServices> | null = nul
 
 function getVectorServices() {
   if (!vectorServicesInstance) {
-    const projectPath = path.dirname(DEVLOG_PATH);
-    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+    const projectPath = path.dirname(DOKORO_PATH);
+    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
     ensureVectorTables(sqlite);
-    vectorServicesInstance = createVectorServices(sqlite, path.join(projectPath, path.basename(DEVLOG_PATH)));
+    vectorServicesInstance = createVectorServices(sqlite, path.join(projectPath, path.basename(DOKORO_PATH)));
   }
   return vectorServicesInstance;
 }
 
 function getSqlite() {
-  const projectPath = path.dirname(DEVLOG_PATH);
-  return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+  const projectPath = path.dirname(DOKORO_PATH);
+  return getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
 }
 
 function formatSearchResult(r: SearchResult, i: number): string {

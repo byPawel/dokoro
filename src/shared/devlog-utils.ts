@@ -7,7 +7,7 @@ import { promises as fs, existsSync } from 'fs';
 
 // Get devlog path from environment or use default
 // Prevents devlog/devlog doubling when cwd is already the devlog directory
-export const DEVLOG_PATH = process.env.DEVLOG_PATH || (() => {
+export const DOKORO_PATH = process.env.DOKORO_PATH || (() => {
   const cwd = process.cwd();
   const withDevlog = path.join(cwd, 'devlog');
   // If cwd is already named 'devlog' and there's no nested devlog/ subfolder, use cwd directly

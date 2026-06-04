@@ -9,7 +9,7 @@ import { lancedbTools } from '../tools/lancedb-tools.js';
 import { basicTools } from '../tools/basic-tools.js';
 import { getSqliteDb } from '../db/index.js';
 import { startBackgroundIndexer } from '../services/background-indexer.js';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import * as path from 'node:path';
 import type { ToolDefinition } from '../tools/registry.js';
 
@@ -21,7 +21,7 @@ async function main() {
   ].filter(Boolean);
 
   // Conditionally load tachibot bridge tools (dynamic import = zero cost when disabled)
-  if (process.env.DEVLOG_ENABLE_TACHIBOT_BRIDGE === 'true') {
+  if (process.env.DOKORO_ENABLE_TACHIBOT_BRIDGE === 'true') {
     const { bridgeTools } = await import('../tools/bridge-tools.js');
     allTools.push(...bridgeTools);
     console.error(`[SearchServer] Tachibot bridge: ${bridgeTools.length} tools loaded`);
@@ -39,9 +39,9 @@ async function main() {
   await startServer(server, allTools, config);
 
   try {
-    const projectPath = path.dirname(DEVLOG_PATH);
-    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
-    startBackgroundIndexer(sqlite, path.join(projectPath, path.basename(DEVLOG_PATH)));
+    const projectPath = path.dirname(DOKORO_PATH);
+    const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
+    startBackgroundIndexer(sqlite, path.join(projectPath, path.basename(DOKORO_PATH)));
   } catch (err) {
     console.error('[SearchServer] Background indexer failed to start:', err);
   }

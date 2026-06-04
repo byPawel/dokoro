@@ -146,7 +146,7 @@ export function hasNerdFontSupport(): boolean {
   if (_nerdFontSupport !== null) return _nerdFontSupport;
 
   // Explicit enable/disable via env
-  const explicit = process.env.DEVLOG_ICON_MODE || process.env.NERD_FONTS;
+  const explicit = process.env.DOKORO_ICON_MODE || process.env.NERD_FONTS;
   if (explicit === 'nerd' || explicit === '1' || explicit === 'true') {
     _nerdFontSupport = true;
     return true;

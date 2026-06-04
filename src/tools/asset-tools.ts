@@ -4,12 +4,12 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
 // Assets directory
-const ASSETS_DIR = path.join(DEVLOG_PATH, 'assets');
+const ASSETS_DIR = path.join(DOKORO_PATH, 'assets');
 const IMAGES_DIR = path.join(ASSETS_DIR, 'images');
 
 export const assetTools: ToolDefinition[] = [
@@ -90,7 +90,7 @@ export const assetTools: ToolDefinition[] = [
         }
 
         // Get relative path for markdown reference
-        const relativePath = path.relative(DEVLOG_PATH, targetPath);
+        const relativePath = path.relative(DOKORO_PATH, targetPath);
         const markdownRef = `![${description || 'image'}](${relativePath})`;
 
         // Log to current workspace if active
@@ -186,7 +186,7 @@ export const assetTools: ToolDefinition[] = [
 
         await fs.copyFile(sourcePath, targetPath);
 
-        const relativePath = path.relative(DEVLOG_PATH, targetPath);
+        const relativePath = path.relative(DOKORO_PATH, targetPath);
 
         // Log to workspace
         const workspace = await getCurrentWorkspace();

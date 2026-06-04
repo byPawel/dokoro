@@ -6,7 +6,7 @@
  * - bridge_import_plan: Import tachibot planner phases into devlog plans
  * - bridge_get_context: Pull relevant devlog knowledge for tachibot reasoning
  *
- * All opt-in via DEVLOG_ENABLE_TACHIBOT_BRIDGE=true
+ * All opt-in via DOKORO_ENABLE_TACHIBOT_BRIDGE=true
  */
 
 import { z } from 'zod';

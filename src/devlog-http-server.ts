@@ -11,7 +11,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolResult, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 // Get devlog path from environment or use default
-const DEVLOG_PATH = process.env.DEVLOG_PATH || path.join(process.cwd(), '..', 'devlog');
+const DOKORO_PATH = process.env.DOKORO_PATH || path.join(process.cwd(), '..', 'devlog');
 const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3100;
 
 // Helper to read devlog files
@@ -34,16 +34,16 @@ async function searchDevlogs(query: string, type: string = 'all') {
   };
   
   const pattern = patterns[type] || patterns.all;
-  const files = await glob(pattern, { cwd: DEVLOG_PATH });
+  const files = await glob(pattern, { cwd: DOKORO_PATH });
   
   const results = [];
   for (const file of files) {
-    const content = await readDevlogFile(path.join(DEVLOG_PATH, file));
+    const content = await readDevlogFile(path.join(DOKORO_PATH, file));
     if (content && content.toLowerCase().includes(query.toLowerCase())) {
       results.push({
         file,
         excerpt: content.substring(0, 200) + '...',
-        lastModified: (await fs.stat(path.join(DEVLOG_PATH, file))).mtime,
+        lastModified: (await fs.stat(path.join(DOKORO_PATH, file))).mtime,
       });
     }
   }
@@ -117,13 +117,13 @@ const getDevLogServer = () => {
       };
       
       const pattern = patterns[type] || patterns.all;
-      const files = await glob(pattern, { cwd: DEVLOG_PATH });
+      const files = await glob(pattern, { cwd: DOKORO_PATH });
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
       
       const recentFiles = [];
       for (const file of files) {
-        const stats = await fs.stat(path.join(DEVLOG_PATH, file));
+        const stats = await fs.stat(path.join(DOKORO_PATH, file));
         if (stats.mtime > cutoffDate) {
           recentFiles.push({
             file,
@@ -197,7 +197,7 @@ const getDevLogServer = () => {
         content: [
           {
             type: 'text',
-            text: `✅ DevLog MCP Server is running!\n\nDevLog Path: ${DEVLOG_PATH}\nServer Port: ${MCP_PORT}`,
+            text: `✅ DevLog MCP Server is running!\n\nDevLog Path: ${DOKORO_PATH}\nServer Port: ${MCP_PORT}`,
           },
         ],
       };
@@ -228,7 +228,7 @@ app.get('/', (req, res) => {
         <ul>
           <li>Server: ✅ Running</li>
           <li>Port: ${MCP_PORT}</li>
-          <li>DevLog Path: ${DEVLOG_PATH}</li>
+          <li>DevLog Path: ${DOKORO_PATH}</li>
           <li>Active Sessions: ${Object.keys(transports).length}</li>
         </ul>
         
@@ -318,6 +318,6 @@ app.post('/mcp', async (req, res) => {
 // Start server
 app.listen(MCP_PORT, () => {
   console.log(`🚀 DevLog MCP HTTP Server running at http://localhost:${MCP_PORT}`);
-  console.log(`📁 DevLog Path: ${DEVLOG_PATH}`);
+  console.log(`📁 DevLog Path: ${DOKORO_PATH}`);
   console.log(`\n📄 Visit http://localhost:${MCP_PORT} for server info`);
 });

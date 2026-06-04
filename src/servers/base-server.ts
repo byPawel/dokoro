@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ToolDefinition, registerTools } from '../tools/registry.js';
 import { withToolTracking } from '../utils/tool-tracker.js';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import { promises as fs } from 'fs';
 import path from 'node:path';
 import { getSqliteDb } from '../db/index.js';
@@ -34,7 +34,7 @@ export function createDevlogServer(config: ServerConfig): McpServer {
 
 async function isDevlogInitialized(): Promise<boolean> {
   try {
-    await fs.access(DEVLOG_PATH);
+    await fs.access(DOKORO_PATH);
     return true;
   } catch {
     return false;
@@ -60,12 +60,12 @@ export async function startServer(server: McpServer, tools: ToolDefinition[], co
   if (!devlogExists) {
     console.error('⚠️  DevLog not initialized in this project!');
     console.error('   Run "dokoro_init" to create devlog structure.');
-    console.error('   Current path:', DEVLOG_PATH);
+    console.error('   Current path:', DOKORO_PATH);
   } else {
     // Crash recovery: re-compact any sessions left mid-compaction at last exit.
     try {
-      const projectPath = path.dirname(DEVLOG_PATH);
-      const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+      const projectPath = path.dirname(DOKORO_PATH);
+      const sqlite = getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
       const recovered = await new CompactionService(sqlite).recoverAll();
       if (recovered.length) {
         console.error(`   Recovered ${recovered.length} pending compaction(s).`);
@@ -74,6 +74,6 @@ export async function startServer(server: McpServer, tools: ToolDefinition[], co
       console.error('   Compaction recovery skipped:', (e as Error).message);
     }
     console.error(`✅ ${config.name} v${config.version} running...`);
-    console.error('   DevLog path:', DEVLOG_PATH);
+    console.error('   DevLog path:', DOKORO_PATH);
   }
 }

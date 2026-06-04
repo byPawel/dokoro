@@ -8,7 +8,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 
 // Backup data structures
 interface BackupItem {
@@ -28,7 +28,7 @@ interface BackupItem {
 // Get all tracking files
 async function getAllTrackingFiles(): Promise<string[]> {
   const files: string[] = [];
-  const trackingPath = path.join(DEVLOG_PATH, 'tracking');
+  const trackingPath = path.join(DOKORO_PATH, 'tracking');
   
   try {
     const categories = ['issues', 'features'];
@@ -128,7 +128,7 @@ async function parseTrackingFile(filePath: string): Promise<BackupItem | null> {
 async function createBackupFile(items: BackupItem[]): Promise<string> {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '-');
   const backupFileName = `backup-${timestamp}.json`;
-  const backupPath = path.join(DEVLOG_PATH, 'tracking', 'backups', backupFileName);
+  const backupPath = path.join(DOKORO_PATH, 'tracking', 'backups', backupFileName);
   
   // Ensure backup directory exists
   await fs.mkdir(path.dirname(backupPath), { recursive: true });
@@ -148,7 +148,7 @@ async function createBackupFile(items: BackupItem[]): Promise<string> {
 // Get the latest backup file
 async function getLatestBackup(): Promise<string | null> {
   try {
-    const backupDir = path.join(DEVLOG_PATH, 'tracking', 'backups');
+    const backupDir = path.join(DOKORO_PATH, 'tracking', 'backups');
     const files = await fs.readdir(backupDir);
     const backupFiles = files.filter(f => f.startsWith('backup-') && f.endsWith('.json'));
     
@@ -470,7 +470,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
         const missingDirs: string[] = [];
         
         for (const dir of requiredDirs) {
-          const fullPath = path.join(DEVLOG_PATH, '..', dir);
+          const fullPath = path.join(DOKORO_PATH, '..', dir);
           try {
             await fs.access(fullPath);
           } catch {
@@ -487,7 +487,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
           if (fix_issues) {
             output += `\n🔧 Creating missing directories...\n`;
             for (const dir of missingDirs) {
-              const fullPath = path.join(DEVLOG_PATH, '..', dir);
+              const fullPath = path.join(DOKORO_PATH, '..', dir);
               await fs.mkdir(fullPath, { recursive: true });
               output += `✅ Created: ${dir}\n`;
             }
@@ -510,7 +510,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
             // Check if file is in correct directory
             const expectedDir = item.type === 'issue' ? 'issues' : 'features';
             const expectedStatus = item.status || 'pending';
-            const expectedPath = path.join(DEVLOG_PATH, 'tracking', expectedDir, expectedStatus);
+            const expectedPath = path.join(DOKORO_PATH, 'tracking', expectedDir, expectedStatus);
             
             if (!file.startsWith(expectedPath)) {
               orphanedFiles.push(file);
@@ -547,7 +547,7 @@ export const backupRecoveryTools: ToolDefinition[] = [
         
         // Check currentWeek.md integration
         try {
-          const currentWeekPath = path.join(DEVLOG_PATH, 'currentWeek.md');
+          const currentWeekPath = path.join(DOKORO_PATH, 'currentWeek.md');
           const currentWeekContent = await fs.readFile(currentWeekPath, 'utf-8');
           
           const hasTrackingSection = currentWeekContent.includes('🐛 Issues & 🚀 Features This Week') ||

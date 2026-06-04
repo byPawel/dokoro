@@ -1,7 +1,7 @@
 /**
  * Tests for question-tools concurrent write safety (BUG-20)
  *
- * Strategy: set process.env.DEVLOG_PATH to a temp dir, then use
+ * Strategy: set process.env.DOKORO_PATH to a temp dir, then use
  * jest.isolateModules() to load a fresh question-tools instance whose
  * QUESTIONS_FILE points at that temp dir.  This avoids touching the real
  * devlog directory and lets us inspect the file directly.
@@ -50,13 +50,13 @@ describe('question-tools concurrent writes (BUG-20)', () => {
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devlog-qtools-test-'));
     await fs.mkdir(path.join(tmpDir, '.mcp'), { recursive: true });
-    // Point DEVLOG_PATH at our temp dir before loading the module
-    process.env['DEVLOG_PATH'] = tmpDir;
+    // Point DOKORO_PATH at our temp dir before loading the module
+    process.env['DOKORO_PATH'] = tmpDir;
     questionTools = await freshModule();
   });
 
   afterEach(async () => {
-    delete process.env['DEVLOG_PATH'];
+    delete process.env['DOKORO_PATH'];
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 

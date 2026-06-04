@@ -2,7 +2,7 @@
  * Tests for lock-manager atomic O_EXCL acquisition (BUG-19)
  *
  * Strategy: set tmpDir BEFORE requiring the lock-manager module so that
- * DEVLOG_PATH (and therefore LOCK_FILE) resolve to the temp directory.
+ * DOKORO_PATH (and therefore LOCK_FILE) resolve to the temp directory.
  * We use jest.isolateModules() to get a fresh module instance per test suite.
  */
 
@@ -14,14 +14,14 @@ let tmpDir: string;
 
 // We must set tmpDir synchronously before the module loads.
 // Using jest.mock with a getter — but LOCK_FILE is computed at module scope
-// with path.join(DEVLOG_PATH, ...), so the getter must be evaluated at that
+// with path.join(DOKORO_PATH, ...), so the getter must be evaluated at that
 // moment.  The only reliable way is to set tmpDir before any require().
 
 // Set a placeholder so the mock registration itself doesn't blow up.
 tmpDir = os.tmpdir();
 
 jest.mock('../types/devlog.js', () => ({
-  get DEVLOG_PATH() {
+  get DOKORO_PATH() {
     return tmpDir;
   },
 }));

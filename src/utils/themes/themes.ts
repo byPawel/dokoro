@@ -333,10 +333,10 @@ export function getTheme(name?: string): Theme {
 }
 
 /**
- * Get current theme from environment variable DEVLOG_THEME
+ * Get current theme from environment variable DOKORO_THEME
  */
 export function getCurrentTheme(): Theme {
-  const themeName = process.env.DEVLOG_THEME?.toLowerCase();
+  const themeName = process.env.DOKORO_THEME?.toLowerCase();
   return getTheme(themeName);
 }
 

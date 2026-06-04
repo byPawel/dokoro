@@ -13,7 +13,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 
 interface CurrentWorkspaceParams {
   includeDays?: number;
@@ -37,7 +37,7 @@ export const currentWorkspaceTools: ToolDefinition[] = [
     },
     handler: async ({ includeDays = 7, preserveSections = [] }: CurrentWorkspaceParams): Promise<CallToolResult> => {
       try {
-        const currentPath = path.join(DEVLOG_PATH, 'current.md');
+        const currentPath = path.join(DOKORO_PATH, 'current.md');
         
         // Read existing current.md if it exists
         let existingContent = '';
@@ -108,7 +108,7 @@ export const currentWorkspaceTools: ToolDefinition[] = [
     },
     handler: async ({ section, content, append = false }: UpdateSectionParams): Promise<CallToolResult> => {
       try {
-        const currentPath = path.join(DEVLOG_PATH, 'current.md');
+        const currentPath = path.join(DOKORO_PATH, 'current.md');
         
         // Read existing file
         const existingContent = await fs.readFile(currentPath, 'utf-8');
@@ -157,7 +157,7 @@ export const currentWorkspaceTools: ToolDefinition[] = [
     inputSchema: {},
     handler: async (): Promise<CallToolResult> => {
       try {
-        const currentPath = path.join(DEVLOG_PATH, 'current.md');
+        const currentPath = path.join(DOKORO_PATH, 'current.md');
         const content = await fs.readFile(currentPath, 'utf-8');
         const parsed = matter(content);
         
@@ -233,7 +233,7 @@ async function analyzeRecentActivity(days: number): Promise<ActivityAnalysis> {
   };
   
   // Analyze daily files
-  const dailyPattern = path.join(DEVLOG_PATH, 'daily', '**/*.md');
+  const dailyPattern = path.join(DOKORO_PATH, 'daily', '**/*.md');
   const dailyFiles = await glob(dailyPattern);
   
   for (const file of dailyFiles) {
@@ -322,7 +322,7 @@ activeTags: [${Array.from(analysis.activeTags).join(', ')}]
   // List all in-progress tasks
   if (analysis.inProgress.length > 0) {
     analysis.inProgress.forEach(({ task, file }) => {
-      const relPath = path.relative(DEVLOG_PATH, file);
+      const relPath = path.relative(DOKORO_PATH, file);
       content += `- [ ] ${task} *(${relPath})*\n`;
     });
   } else {

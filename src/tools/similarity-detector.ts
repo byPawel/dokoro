@@ -19,7 +19,7 @@ export class SimilarityDetector {
   private index: SimilarityIndex | null = null;
   private readonly devlogPath: string;
 
-  constructor(devlogPath: string = process.env.DEVLOG_PATH || path.join(process.cwd(), 'devlog')) {
+  constructor(devlogPath: string = process.env.DOKORO_PATH || path.join(process.cwd(), 'devlog')) {
     this.devlogPath = devlogPath;
   }
 

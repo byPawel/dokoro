@@ -8,7 +8,7 @@ import { extractMetadata, updateMetadata, classifyToolActivity } from './session
 import { updateLockHeartbeat } from './lock-manager.js';
 import { notifyActivity } from './heartbeat-manager.js';
 import { getSqliteDb } from '../db/index.js';
-import { DEVLOG_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/devlog-utils.js';
 import * as path from 'node:path';
 
 interface ToolContext {
@@ -126,8 +126,8 @@ function getAutoFeedbackDb(): import('better-sqlite3').Database | null {
   try {
     const testDb = (globalThis as Record<string, unknown>).__TEST_DB__ as import('better-sqlite3').Database | undefined;
     if (testDb) return testDb;
-    const projectPath = path.dirname(DEVLOG_PATH);
-    return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+    const projectPath = path.dirname(DOKORO_PATH);
+    return getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
   } catch {
     return null;
   }
@@ -138,11 +138,11 @@ function getAutoFeedbackDb(): import('better-sqlite3').Database | null {
  * Failures are swallowed silently — this must never impact the tool's own error propagation.
  */
 function recordAutoFeedback(toolName: string, outcome: 'success' | 'failure', latencyMs: number): void {
-  if (process.env.DEVLOG_AUTO_FEEDBACK === 'false') return;
+  if (process.env.DOKORO_AUTO_FEEDBACK === 'false') return;
   try {
     const db = getAutoFeedbackDb();
     if (!db) return;
-    const agentId = process.env.DEVLOG_AGENT_ID ?? 'unknown';
+    const agentId = process.env.DOKORO_AGENT_ID ?? 'unknown';
     db.prepare(`
       INSERT INTO agent_feedback (agent_id, tool_name, outcome, latency_ms, recorded_at)
       VALUES (?, ?, ?, ?, datetime('now'))

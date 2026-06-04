@@ -71,7 +71,7 @@ export const summarizationTools: ToolDefinition[] = [
     handler: async (args: { file: string; maxWords?: number; includeMetadata?: boolean }): Promise<CallToolResult> => {
       const { file, maxWords = 150, includeMetadata = true } = args;
       try {
-        const devlogPath = process.env.DEVLOG_PATH || path.join(process.cwd(), 'devlog');
+        const devlogPath = process.env.DOKORO_PATH || path.join(process.cwd(), 'devlog');
         const filePath = path.join(devlogPath, file);
         const content = await fs.readFile(filePath, 'utf-8');
         const parsed = matter(content);

@@ -4,7 +4,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
@@ -34,7 +34,7 @@ interface Plan {
 }
 
 // Plans storage path
-const PLANS_DIR = path.join(DEVLOG_PATH, '.mcp', 'plans');
+const PLANS_DIR = path.join(DOKORO_PATH, '.mcp', 'plans');
 const PLANS_INDEX = path.join(PLANS_DIR, 'index.json');
 
 // Load plans index
@@ -509,7 +509,7 @@ export const planTools: ToolDefinition[] = [
 
       // Save validation report to file
       const reportFilename = `${plan.id}-validation-${now.split('T')[0]}.md`;
-      const reportPath = path.join(DEVLOG_PATH, 'daily', reportFilename);
+      const reportPath = path.join(DOKORO_PATH, 'daily', reportFilename);
       await fs.mkdir(path.dirname(reportPath), { recursive: true });
 
       let reportContent = '---\n';

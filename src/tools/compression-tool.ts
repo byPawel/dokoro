@@ -8,7 +8,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import matter from 'gray-matter';
 import { glob } from 'glob';
 
@@ -64,9 +64,9 @@ export const compressionTool: ToolDefinition = {
       const weeklySummary = await generateWeeklySummary(sessions, weekNumber, currentYear);
       
       // Paths for new files
-      const weeklyFile = path.join(DEVLOG_PATH, 'retrospective', 'weekly', 
+      const weeklyFile = path.join(DOKORO_PATH, 'retrospective', 'weekly', 
         `${currentYear}-W${String(weekNumber).padStart(2, '0')}-consolidated.md`);
-      const archiveDir = path.join(DEVLOG_PATH, 'archive', 'daily', 
+      const archiveDir = path.join(DOKORO_PATH, 'archive', 'daily', 
         `${currentYear}-W${String(weekNumber).padStart(2, '0')}`);
       
       if (dryRun) {
@@ -107,8 +107,8 @@ export const compressionTool: ToolDefinition = {
             `- Decisions made: ${sessions.flatMap(s => s.decisions).length}\n` +
             `- Insights captured: ${sessions.flatMap(s => s.insights).length}\n\n` +
             `📁 Files:\n` +
-            `- Weekly summary: ${path.relative(DEVLOG_PATH, weeklyFile)}\n` +
-            `- Archived to: ${path.relative(DEVLOG_PATH, archiveDir)}/\n\n` +
+            `- Weekly summary: ${path.relative(DOKORO_PATH, weeklyFile)}\n` +
+            `- Archived to: ${path.relative(DOKORO_PATH, archiveDir)}/\n\n` +
             `💡 The weekly summary is now the primary search target.\n` +
             `Original files are preserved in archive for reference.`
         }]
@@ -154,7 +154,7 @@ function getWeekDates(year: number, weekNumber: number) {
 }
 
 async function findDailyFiles(startDate: Date, endDate: Date): Promise<string[]> {
-  const pattern = path.join(DEVLOG_PATH, 'daily', '*.md');
+  const pattern = path.join(DOKORO_PATH, 'daily', '*.md');
   const files = await glob(pattern);
   
   return files.filter(file => {

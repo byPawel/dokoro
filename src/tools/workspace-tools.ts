@@ -5,12 +5,12 @@ import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace, generateAgentId, parseAgentFromContent } from '../utils/workspace.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { getSqliteDb } from '../db/index.js';
 
 function getSqlite(): Database.Database {
-  const projectPath = path.dirname(DEVLOG_PATH);
-  return getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+  const projectPath = path.dirname(DOKORO_PATH);
+  return getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
 }
 
 function db(): Database.Database {
@@ -419,7 +419,7 @@ export const workspaceTools: ToolDefinition[] = [
       
       // Create filename
       const filename = `${dateStr}-${timeStr}-${dayName}-session-${safeTopic}.md`;
-      const dailyDir = path.join(DEVLOG_PATH, 'daily');
+      const dailyDir = path.join(DOKORO_PATH, 'daily');
       const sessionFile = path.join(dailyDir, filename);
       
       // Prepare session content
@@ -496,10 +496,10 @@ export const workspaceTools: ToolDefinition[] = [
 
         // Register in docs table so entity_extract_deep can find it
         try {
-          const projectPath = path.dirname(DEVLOG_PATH);
-          const db = getSqliteDb({ projectPath, devlogFolder: path.basename(DEVLOG_PATH) });
+          const projectPath = path.dirname(DOKORO_PATH);
+          const db = getSqliteDb({ projectPath, devlogFolder: path.basename(DOKORO_PATH) });
           const docId = path.basename(filename, '.md');
-          const relPath = path.relative(DEVLOG_PATH, sessionFile);
+          const relPath = path.relative(DOKORO_PATH, sessionFile);
           const now_iso = new Date().toISOString();
           db.prepare(`
             INSERT INTO docs (id, filepath, title, content, doc_type, status, created_at, updated_at)
@@ -535,7 +535,7 @@ export const workspaceTools: ToolDefinition[] = [
 
         const details: Record<string, string> = {
           'Full path': sessionFile,
-          'Relative': path.relative(DEVLOG_PATH, sessionFile),
+          'Relative': path.relative(DOKORO_PATH, sessionFile),
           'Status': status.toUpperCase(),
           'Type': docType,
           'Reason': reason,

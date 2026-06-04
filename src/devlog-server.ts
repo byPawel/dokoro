@@ -8,7 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolResult, GetPromptResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 // Get devlog path from environment or use default
-import { DEVLOG_PATH } from './shared/devlog-utils.js';
+import { DOKORO_PATH } from './shared/devlog-utils.js';
 
 // Initialize the MCP server
 const server = new McpServer({
@@ -43,16 +43,16 @@ async function searchDevlogs(query: string, type: string = 'all') {
   };
   
   const pattern = patterns[type] || patterns.all;
-  const files = await glob(pattern, { cwd: DEVLOG_PATH });
+  const files = await glob(pattern, { cwd: DOKORO_PATH });
   
   const results = [];
   for (const file of files) {
-    const content = await readDevlogFile(path.join(DEVLOG_PATH, file));
+    const content = await readDevlogFile(path.join(DOKORO_PATH, file));
     if (content && content.toLowerCase().includes(query.toLowerCase())) {
       results.push({
         file,
         excerpt: content.substring(0, 200) + '...',
-        lastModified: (await fs.stat(path.join(DEVLOG_PATH, file))).mtime,
+        lastModified: (await fs.stat(path.join(DOKORO_PATH, file))).mtime,
       });
     }
   }
@@ -105,13 +105,13 @@ server.tool(
     };
     
     const pattern = patterns[type] || patterns.all;
-    const files = await glob(pattern, { cwd: DEVLOG_PATH });
+    const files = await glob(pattern, { cwd: DOKORO_PATH });
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     
     const recentFiles = [];
     for (const file of files) {
-      const stats = await fs.stat(path.join(DEVLOG_PATH, file));
+      const stats = await fs.stat(path.join(DOKORO_PATH, file));
       if (stats.mtime > cutoffDate) {
         recentFiles.push({
           file,
@@ -277,10 +277,10 @@ server.registerResource(
     mimeType: 'text/plain',
   },
   async (): Promise<ReadResourceResult> => {
-    const postFiles = await glob('posts/**/*.md', { cwd: DEVLOG_PATH });
+    const postFiles = await glob('posts/**/*.md', { cwd: DOKORO_PATH });
     const sortedFiles = await Promise.all(
       postFiles.map(async (file: string) => {
-        const stats = await fs.stat(path.join(DEVLOG_PATH, file));
+        const stats = await fs.stat(path.join(DOKORO_PATH, file));
         return { file, mtime: stats.mtime };
       })
     );

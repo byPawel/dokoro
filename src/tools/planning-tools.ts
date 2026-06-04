@@ -4,7 +4,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 // renderOutput available for future migration
 // import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
@@ -142,7 +142,7 @@ export const planningTools: ToolDefinition[] = [
       
       // Save plan to file
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const planFile = path.join(DEVLOG_PATH, 'planning', `${timestamp}-${feature.replace(/\s+/g, '-').toLowerCase()}-plan.md`);
+      const planFile = path.join(DOKORO_PATH, 'planning', `${timestamp}-${feature.replace(/\s+/g, '-').toLowerCase()}-plan.md`);
       
       try {
         await fs.mkdir(path.dirname(planFile), { recursive: true });
@@ -182,7 +182,7 @@ export const planningTools: ToolDefinition[] = [
     handler: async ({ topic, findings, sources, tags }): Promise<CallToolResult> => {
       const timestamp = new Date().toISOString().split('T')[0];
       const fileName = `${timestamp}-${topic.replace(/\s+/g, '-').toLowerCase()}-research.md`;
-      const filePath = path.join(DEVLOG_PATH, 'insights', fileName);
+      const filePath = path.join(DOKORO_PATH, 'insights', fileName);
       
       // Build content
       let content = '---\n';

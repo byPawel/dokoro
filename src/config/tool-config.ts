@@ -27,38 +27,38 @@ export function loadToolConfig(): ToolConfig {
     
     // AI-powered tools (can be disabled)
     dokoro_ai_analysis: { 
-      enabled: process.env.DEVLOG_ENABLE_AI_ANALYSIS === 'true',
-      config: { model: process.env.DEVLOG_AI_MODEL || 'gpt-4.1-mini' }
+      enabled: process.env.DOKORO_ENABLE_AI_ANALYSIS === 'true',
+      config: { model: process.env.DOKORO_AI_MODEL || 'gpt-4.1-mini' }
     },
     dokoro_ai_planning: { 
-      enabled: process.env.DEVLOG_ENABLE_AI_PLANNING === 'true' 
+      enabled: process.env.DOKORO_ENABLE_AI_PLANNING === 'true' 
     },
     
     // Search tools
     dokoro_search: { enabled: true },
     dokoro_search_semantic: {
-      enabled: process.env.DEVLOG_ENABLE_SEMANTIC_SEARCH === 'true'
+      enabled: process.env.DOKORO_ENABLE_SEMANTIC_SEARCH === 'true'
     },
 
     // Tachibot bridge tools (connects tachibot-mcp to devlog persistence)
-    bridge_index_research: { enabled: process.env.DEVLOG_ENABLE_TACHIBOT_BRIDGE === 'true' },
-    bridge_import_plan: { enabled: process.env.DEVLOG_ENABLE_TACHIBOT_BRIDGE === 'true' },
-    bridge_get_context: { enabled: process.env.DEVLOG_ENABLE_TACHIBOT_BRIDGE === 'true' },
+    bridge_index_research: { enabled: process.env.DOKORO_ENABLE_TACHIBOT_BRIDGE === 'true' },
+    bridge_import_plan: { enabled: process.env.DOKORO_ENABLE_TACHIBOT_BRIDGE === 'true' },
+    bridge_get_context: { enabled: process.env.DOKORO_ENABLE_TACHIBOT_BRIDGE === 'true' },
   };
 
   // Load from environment variable
-  const configOverride = process.env.DEVLOG_TOOL_CONFIG;
+  const configOverride = process.env.DOKORO_TOOL_CONFIG;
   if (configOverride) {
     try {
       const override = JSON.parse(configOverride);
       return { ...defaultConfig, ...override };
     } catch {
-      console.warn('Invalid DEVLOG_TOOL_CONFIG, using defaults');
+      console.warn('Invalid DOKORO_TOOL_CONFIG, using defaults');
     }
   }
 
   // Load from file if exists
-  const configPath = process.env.DEVLOG_TOOL_CONFIG_PATH;
+  const configPath = process.env.DOKORO_TOOL_CONFIG_PATH;
   if (configPath) {
     try {
       const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));

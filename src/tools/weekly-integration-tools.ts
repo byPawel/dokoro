@@ -8,7 +8,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 
 // Item types for weekly integration
 const WeeklyItemType = z.enum(['issue', 'feature', 'task']);
@@ -26,7 +26,7 @@ interface WeeklyItem {
 
 // Get current week's file path
 function getCurrentWeekFilePath(): string {
-  return path.join(DEVLOG_PATH, 'currentWeek.md');
+  return path.join(DOKORO_PATH, 'currentWeek.md');
 }
 
 // Parse currentWeek.md to extract existing structure
@@ -203,7 +203,7 @@ async function addItemToCurrentWeek(item: WeeklyItem): Promise<void> {
 // Extract items from current.md
 async function extractItemsFromCurrent(): Promise<WeeklyItem[]> {
   try {
-    const currentPath = path.join(DEVLOG_PATH, 'current.md');
+    const currentPath = path.join(DOKORO_PATH, 'current.md');
     const content = await fs.readFile(currentPath, 'utf-8');
     const lines = content.split('\n');
     
@@ -568,11 +568,11 @@ export const weeklyIntegrationTools: ToolDefinition[] = [
           
           try {
             // Try to extract time information from current.md metadata
-            const currentPath = path.join(DEVLOG_PATH, 'current.md');
+            const currentPath = path.join(DOKORO_PATH, 'current.md');
             const currentContent = await fs.readFile(currentPath, 'utf-8');
             
             // Extract timing metadata
-            const metadataMatch = currentContent.match(/<!-- DEVLOG_METADATA[^>]*\n(.*?)\n-->/s);
+            const metadataMatch = currentContent.match(/<!-- DOKORO_METADATA[^>]*\n(.*?)\n-->/s);
             if (metadataMatch) {
               const metadata = JSON.parse(metadataMatch[1]);
               

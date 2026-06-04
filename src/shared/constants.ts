@@ -5,7 +5,7 @@
 export const LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
 export const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
-export const DEVLOG_FOLDERS = {
+export const DOKORO_FOLDERS = {
   DAILY: 'daily',
   FEATURES: 'features',
   DECISIONS: 'decisions',

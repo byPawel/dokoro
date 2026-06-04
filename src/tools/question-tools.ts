@@ -4,7 +4,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
@@ -21,7 +21,7 @@ interface Question {
 }
 
 // Questions file path
-const QUESTIONS_FILE = path.join(DEVLOG_PATH, '.mcp', 'questions.json');
+const QUESTIONS_FILE = path.join(DOKORO_PATH, '.mcp', 'questions.json');
 
 // In-process async mutex for questions.json — serialises concurrent
 // read-modify-write calls so no writes are lost (BUG-20).

@@ -3,7 +3,7 @@ import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { readFile, readdir } from 'fs/promises';
 import { join, basename } from 'path';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import matter from 'gray-matter';
 
 interface Pattern {
@@ -74,7 +74,7 @@ async function readDevLogFiles(): Promise<DevLogFile[]> {
     }
   }
   
-  await scanDirectory(DEVLOG_PATH);
+  await scanDirectory(DOKORO_PATH);
   return files;
 }
 

@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { WorkspaceInfo, AgentInfo, DEVLOG_PATH } from '../types/devlog.js';
+import { WorkspaceInfo, AgentInfo, DOKORO_PATH } from '../types/devlog.js';
 
 /**
  * Generate a unique agent ID with collision detection
@@ -38,7 +38,7 @@ export async function generateAgentId(): Promise<string> {
  * Get current workspace information
  */
 export async function getCurrentWorkspace(): Promise<WorkspaceInfo> {
-  const currentPath = path.join(DEVLOG_PATH, 'current.md');
+  const currentPath = path.join(DOKORO_PATH, 'current.md');
   try {
     const content = await fs.readFile(currentPath, 'utf-8');
     return { path: currentPath, content, exists: true };

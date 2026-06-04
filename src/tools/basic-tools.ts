@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 
@@ -23,7 +23,7 @@ export const basicTools: ToolDefinition[] = [
                 status: 'success',
                 message: 'Server is working!',
                 details: {
-                  'DevLog Path': DEVLOG_PATH,
+                  'DevLog Path': DOKORO_PATH,
                 },
               },
             }),

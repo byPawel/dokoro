@@ -9,7 +9,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 
 // Feature status enum
 // const _FeatureStatus = z.enum(['ideas', 'planned', 'active', 'completed', 'archived']);
@@ -43,7 +43,7 @@ function generateFeatureId(): string {
 
 // Get feature file path
 function getFeatureFilePath(status: string, id: string): string {
-  return path.join(DEVLOG_PATH, 'tracking', 'features', status, `${id}.md`);
+  return path.join(DOKORO_PATH, 'tracking', 'features', status, `${id}.md`);
 }
 
 // Create feature file content
@@ -177,7 +177,7 @@ async function parseFeatureFile(filePath: string): Promise<Feature | null> {
 // List features in a directory
 async function listFeaturesInDirectory(dir: string): Promise<Feature[]> {
   try {
-    const dirPath = path.join(DEVLOG_PATH, 'tracking', 'features', dir);
+    const dirPath = path.join(DOKORO_PATH, 'tracking', 'features', dir);
     const files = await fs.readdir(dirPath);
     const features: Feature[] = [];
     
@@ -212,7 +212,7 @@ export const featureTrackingTools: ToolDefinition[] = [
     handler: async ({ title, complexity, priority, estimate, description }): Promise<CallToolResult> => {
       try {
         // Ensure tracking directories exist
-        const trackingDir = path.join(DEVLOG_PATH, 'tracking', 'features', 'ideas');
+        const trackingDir = path.join(DOKORO_PATH, 'tracking', 'features', 'ideas');
         await fs.mkdir(trackingDir, { recursive: true });
         
         // Generate feature
@@ -547,7 +547,7 @@ export const featureTrackingTools: ToolDefinition[] = [
         // Create implementation plan
         const planDate = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '-');
         const planFileName = `${planDate}-${feature.title.toLowerCase().replace(/\s+/g, '-')}-implementation-plan.md`;
-        const planFilePath = path.join(DEVLOG_PATH, 'features', planFileName);
+        const planFilePath = path.join(DOKORO_PATH, 'features', planFileName);
         
         // Ensure features directory exists
         await fs.mkdir(path.dirname(planFilePath), { recursive: true });

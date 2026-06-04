@@ -5,7 +5,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 
 export interface WorkspaceLock {
   agent_id: string;
@@ -16,7 +16,7 @@ export interface WorkspaceLock {
   pid?: number;
 }
 
-const LOCK_FILE = path.join(DEVLOG_PATH, '.mcp', 'workspace.lock');
+const LOCK_FILE = path.join(DOKORO_PATH, '.mcp', 'workspace.lock');
 const LOCK_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const STALE_THRESHOLD = 60 * 60 * 1000; // 1 hour - definitely stale
 

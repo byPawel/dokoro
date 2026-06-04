@@ -48,7 +48,7 @@ export interface SessionMetadata {
 }
 
 // Legacy markers for migration
-const LEGACY_METADATA_START = '<!-- DEVLOG_METADATA (do not edit manually)';
+const LEGACY_METADATA_START = '<!-- DOKORO_METADATA (do not edit manually)';
 const LEGACY_METADATA_END = '-->';
 
 /**

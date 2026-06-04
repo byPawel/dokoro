@@ -9,7 +9,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
-import { DEVLOG_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/devlog.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
@@ -60,7 +60,7 @@ function getIssueFilePath(status: string, id: string, title?: string): string {
       filename = `${id}-${summary}`;
     }
   }
-  return path.join(DEVLOG_PATH, 'tracking', 'issues', status, `${filename}.md`);
+  return path.join(DOKORO_PATH, 'tracking', 'issues', status, `${filename}.md`);
 }
 
 // Create issue file content
@@ -181,7 +181,7 @@ async function parseIssueFile(filePath: string): Promise<Issue | null> {
 // List issues in a directory
 async function listIssuesInDirectory(dir: string): Promise<Issue[]> {
   try {
-    const dirPath = path.join(DEVLOG_PATH, 'tracking', 'issues', dir);
+    const dirPath = path.join(DOKORO_PATH, 'tracking', 'issues', dir);
     const files = await fs.readdir(dirPath);
     const issues: Issue[] = [];
     
@@ -216,7 +216,7 @@ export const issueTrackingTools: ToolDefinition[] = [
     handler: async ({ title, category, priority, estimate, description }): Promise<CallToolResult> => {
       try {
         // Ensure tracking directories exist
-        const trackingDir = path.join(DEVLOG_PATH, 'tracking', 'issues', 'pending');
+        const trackingDir = path.join(DOKORO_PATH, 'tracking', 'issues', 'pending');
         await fs.mkdir(trackingDir, { recursive: true });
         
         // Generate issue

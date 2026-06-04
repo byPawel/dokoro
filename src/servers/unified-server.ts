@@ -41,7 +41,7 @@ async function main() {
   }
 
   // Optional: Bridge tools
-  if (process.env.DEVLOG_ENABLE_TACHIBOT_BRIDGE === 'true') {
+  if (process.env.DOKORO_ENABLE_TACHIBOT_BRIDGE === 'true') {
     const { bridgeTools } = await import('../tools/bridge-tools.js');
     allTools.push(...bridgeTools);
     console.error(`[Unified] Bridge tools loaded: ${bridgeTools.length} tools`);
