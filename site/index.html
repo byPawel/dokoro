@@ -445,7 +445,7 @@ footer .meta b{color:var(--text);font-weight:700}
     <div class="stat-row fade" style="animation-delay:.78s">
       <div class="stat"><div class="n c">5</div><div class="l">Memory layers</div></div>
       <div class="stat"><div class="n">3</div><div class="l">Storage backends</div></div>
-      <div class="stat"><div class="n">28</div><div class="l">MCP tools</div></div>
+      <div class="stat"><div class="n">29</div><div class="l">MCP tools</div></div>
       <div class="stat"><div class="n">2</div><div class="l">Native edges*</div></div>
     </div>
   </div>
@@ -543,7 +543,7 @@ footer .meta b{color:var(--text);font-weight:700}
       </div>
       <div class="stage-flag"><span class="step">—</span><span class="cap">Outcomes become a routing policy</span></div>
       <div class="flow-stage" style="height:170px"></div>
-      <div class="legend"><span>Outcome &amp; latency captured <b>automatically</b>; confidence recorded <b>when provided</b></span></div>
+      <div class="legend"><span>Outcome &amp; latency recorded <b>per call</b>; confidence <b>when provided</b></span></div>
     </div>
     <div class="split reveal">
       <div class="ledger">
@@ -704,7 +704,7 @@ footer .meta b{color:var(--text);font-weight:700}
         <div id="layerChips"></div>
       </div>
     </div>
-    <div class="tools-meta reveal">Showing <b id="toolCount">0</b> of 28 entries</div>
+    <div class="tools-meta reveal">Showing <b id="toolCount">0</b> of 29 entries</div>
     <div class="tool-grid" id="toolGrid"></div>
   </div>
 </section>
@@ -789,12 +789,12 @@ const LAYERS = {
     q:"What am I doing right now?",
     desc:"The agent's scratchpad for the task in hand — plus a <b>file-lock</b> so two agents don't trample each other. Like RAM: fast, current, and cleared when the task ends.",
     ex:"claimed: auth-refactor · open Q: needs a regression test",
-    where:"current-workspace.md · sessions(active) · questions.json"},
+    where:"current-workspace.md · lock.json · questions.json"},
   episodic:{label:"Episodic", color:"var(--episodic)", life:"per session", idx:"layer ii",
     q:"What happened last time?",
     desc:"A dated <b>diary of past sessions</b>, written at session end and auto-compacted as it grows. A fresh session resumes days later instead of re-investigating from scratch.",
     ex:"Mon — fixed race in session refresh; partial fix in auth/session.ts",
-    where:"sessions · time_entries · conversation_summaries"},
+    where:"sessions · conversation_summaries"},
   semantic:{label:"Semantic", color:"var(--semantic)", life:"permanent", idx:"layer iii",
     q:"Have I seen this entity before?",
     desc:"The <b>knowledge graph</b>: entities (files, services, decisions) and how they relate, plus document vectors. Answers by <em>meaning</em>, not text match — and every relation is bi-temporal.",
@@ -804,7 +804,7 @@ const LAYERS = {
     q:"What plan am I executing?",
     desc:"The <b>plans and checklists</b> the agent is working through, with progress and blockers. Knowing “where am I in the plan” survives the context window.",
     ex:"plan auth-hardening · 3/7 done · task 4 blocked",
-    where:"docs(doc_type='plan') · plans/*.json"},
+    where:"plans/*.json"},
   affective:{label:"Affective", color:"var(--affective)", life:"all-time", idx:"layer v",
     q:"Does this tool usually work?",
     desc:"A per-tool, per-agent <b>track record</b> — success, failure, latency, confidence. Wilson-ranked and recency-decayed into a routing policy the agent can actually trust.",
@@ -825,7 +825,7 @@ const TOOLS = [
   {n:"devlog_question_check",   l:"working",  st:"questions.json",d:"Check the status of open questions."},
   {n:"devlog_session_recall",   l:"episodic", st:"sqlite + vec",  d:"Read past session summaries — filter by query, session_id, since; semantically re-ranked."},
   {n:"devlog_session_summary_add",l:"episodic",st:"sqlite",       d:"Write a session-end summary; auto-compacted past the token budget."},
-  {n:"devlog_compress_week",    l:"episodic", st:"analytics srv", d:"Generate a compressed weekly summary — sessions, decisions, mermaid charts."},
+  {n:"devlog_compress_week",    l:"episodic", st:"analytics srv", d:"Generate a compressed weekly summary — sessions, tasks completed, decisions made."},
   {n:"devlog_entity_graph",     l:"semantic", st:"sqlite (CTE)",  d:"Search or traverse the entity graph. Accepts as_of for point-in-time bi-temporal queries."},
   {n:"devlog_entity_extract_deep",l:"semantic",st:"ollama",       d:"LLM-powered deep extraction on a document via Ollama (llama3.2)."},
   {n:"devlog_plan_create",      l:"procedural",st:"plans/*.json", d:"Create a development plan with tasks."},
@@ -937,7 +937,7 @@ const affectiveCfg={
   ],
   edges:[{from:"call",to:"out"},{from:"out",to:"store"},{from:"store",to:"decay"},{from:"decay",to:"wilson"},{from:"wilson",to:"route"}],
   stages:[
-    {cap:"Every tool call resolves to an outcome — captured automatically",nodes:["call","out"],edges:[["call","out"]],dur:1000},
+    {cap:"Every recorded call resolves to an outcome",nodes:["call","out"],edges:[["call","out"]],dur:1000},
     {cap:"Outcome + latency written to the agent_feedback table",nodes:["store"],edges:[["out","store"]],dur:1000},
     {cap:"Recency decay fades stale failures by half_life_days",nodes:["decay"],edges:[["store","decay"]],dur:1000},
     {cap:"Wilson lower bound ranks — luck can't outrank a track record",nodes:["wilson"],edges:[["decay","wilson"]],dur:1000},
