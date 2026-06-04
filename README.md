@@ -178,6 +178,9 @@ Tools are organised by which memory layer they read or write.
 | `devlog_workspace_claim` | Claim workspace with a file-based lock |
 | `devlog_workspace_dump` | Export workspace data (registers docs in SQLite) |
 | `devlog_session_log` | Log development session entries with tags |
+| `devlog_regenerate_current` | Auto-generate or update `current.md` from recent activity |
+| `devlog_update_current_section` | Update a specific section in `current.md` |
+| `devlog_get_current_focus` | Read the current focus and active tasks from `current.md` |
 | `devlog_question_add` | Log a question during development |
 | `devlog_question_answer` | Answer a previously logged question |
 | `devlog_question_list` | List all tracked questions |
@@ -191,7 +194,8 @@ Tools are organised by which memory layer they read or write.
 | Tool | Description |
 |------|-------------|
 | `devlog_session_recall` | Read past session summaries (filter by query, session_id, since timestamp) |
-| `devlog_compress_week` | Generate a compressed weekly summary (sessions, decisions, mermaid charts) |
+| `devlog_session_summary_add` | Write a session-end summary — the episodic **write** path |
+| `devlog_compress_week` | Generate a compressed weekly summary (sessions, tasks completed, decisions made) — *analytics server only* |
 
 </details>
 
@@ -225,6 +229,7 @@ Tools are organised by which memory layer they read or write.
 | Tool | Description |
 |------|-------------|
 | `devlog_feedback_record` | Record the outcome of a tool call (success / failure / partial / rejected / timeout) with confidence and latency |
+| `devlog_feedback_route` | Ranked track record (Wilson lower bound + recency decay) to bias tool/model routing |
 | `devlog_feedback_query` | Per-tool success rates, recent failures, agent-specific stats |
 
 </details>
