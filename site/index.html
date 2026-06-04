@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>devlog-mcp — Agent Memory, Engineered</title>
+<meta name="description" content="devlog-mcp: a multi-layer agent-memory MCP server. The five memory layers explained, how agent memory evolved, and interactive diagrams of the session loop, affective routing, bi-temporal facts and the tachibot bridge." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DEVLOG-MCP — AGENT MEMORY, ENGINEERED
+   Modern dark product UI · near-black canvas, glass panels,
+   electric-lime accent, neon layer-coding.
+   Bricolage Grotesque / Hanken Grotesk / JetBrains Mono.
+   ============================================================ */
+
+:root{
+  --bg:#08090c;
+  --bg-1:#0b0d12;
+  --panel:#10121a;
+  --panel-2:#161a25;
+  --border:rgba(255,255,255,.08);
+  --border-2:rgba(255,255,255,.15);
+  --text:#edeff5;
+  --text-soft:#abb0c2;
+  --muted:#767c92;
+  --faint:#535970;
+
+  --accent:#c8f24e;          /* electric lime */
+  --accent-2:#a6e02f;
+  --accent-ink:#0a0d04;
+  --glow:rgba(200,242,78,.35);
+
+  /* memory-layer neons */
+  --working:#34e0a1;
+  --episodic:#5b9dff;
+  --semantic:#b48cff;
+  --procedural:#ff9f45;
+  --affective:#ff6b7d;
+  --storage:#22d3ee;
+
+  --r:16px;
+  --r-lg:22px;
+  --maxw:1180px;
+  --ease:cubic-bezier(.2,.7,.25,1);
+  --shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -34px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Hanken Grotesk",system-ui,sans-serif;
+  font-size:17.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;position:relative;
+}
+
+/* atmosphere: gradient-mesh glows + dotted grid + grain */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(680px 460px at 82% -6%, rgba(200,242,78,.10), transparent 60%),
+    radial-gradient(720px 540px at 8% 8%, rgba(180,140,255,.09), transparent 60%),
+    radial-gradient(820px 620px at 50% 116%, rgba(34,211,238,.08), transparent 60%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:30px 30px;
+  mask-image:radial-gradient(circle at 50% 24%,#000,transparent 78%);
+}
+.grain{position:fixed;inset:0;z-index:999;pointer-events:none;opacity:.04;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+::selection{background:var(--accent);color:var(--accent-ink)}
+
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+
+.mono,.eyebrow,.sec-code,.navlinks a,.depth,.lcount,.tstore,.cmp thead th,.tl-date,.chip,.btn,.ssub,.scrollcue,.tag,.stool,.tname,.tlayer,.dia-title,.stage-flag,.legend,.evo-year,.ex,.kbd{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+}
+h1,h2,h3,.display{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;letter-spacing:-.02em}
+
+/* glass utility */
+.glass{
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
+  border:1px solid var(--border);box-shadow:var(--shadow);
+}
+
+/* ---------- NAV ---------- */
+nav{
+  position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;width:calc(100% - 28px);max-width:calc(var(--maxw) + 36px);
+  display:flex;align-items:center;justify-content:space-between;padding:11px 14px 11px 18px;
+  border:1px solid var(--border);border-radius:999px;
+  background:rgba(12,14,20,.62);backdrop-filter:blur(16px) saturate(1.3);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 14px 34px -20px rgba(0,0,0,.9);
+}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .seal{
+  width:32px;height:32px;display:grid;place-items:center;border-radius:10px;
+  background:linear-gradient(150deg,var(--accent),var(--accent-2));color:var(--accent-ink);
+  font-family:"Bricolage Grotesque";font-weight:800;font-size:17px;
+  box-shadow:0 0 22px -3px var(--glow);
+}
+.brand .bname{font-family:"Bricolage Grotesque";font-weight:700;font-size:18px;line-height:1}
+.brand small{display:block;font-family:"JetBrains Mono";font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.navlinks{display:flex;gap:4px;align-items:center}
+.navlinks a{color:var(--text-soft);transition:.18s;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:8px 11px;border-radius:999px}
+.navlinks a:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.navlinks .pill{color:var(--accent-ink);background:var(--accent);font-weight:700}
+.navlinks .pill:hover{background:var(--accent);box-shadow:0 0 20px -2px var(--glow)}
+@media(max-width:1040px){.navlinks a:not(.pill){display:none}}
+
+/* ---------- HERO ---------- */
+header.hero{position:relative;min-height:100svh;display:flex;align-items:center;padding:150px 0 80px;overflow:hidden}
+#graph{position:absolute;inset:0;z-index:0;opacity:.8}
+.hero .wrap{position:relative;z-index:2}
+.fade{opacity:0;transform:translateY(20px);animation:rise .9s var(--ease) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-soft);
+  margin-bottom:30px;padding:8px 15px 8px 11px;border:1px solid var(--border);border-radius:999px;
+  background:rgba(255,255,255,.03);
+}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(200,242,78,.16),0 0 12px var(--accent);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.eyebrow b{color:var(--text);font-weight:600}
+
+h1.title{font-size:clamp(54px,10vw,140px);font-weight:600;line-height:.9;letter-spacing:-.04em;margin-bottom:30px}
+h1.title .accent{
+  background:linear-gradient(110deg,var(--accent),#e8ff9e 60%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 26px rgba(200,242,78,.35));
+}
+h1.title .light{display:block;font-weight:500;color:var(--text-soft)}
+
+.lede{font-size:clamp(18px,1.9vw,23px);color:var(--text-soft);max-width:650px;margin-bottom:16px;line-height:1.5}
+.lede em{font-style:normal;color:var(--text);font-weight:600}
+.lede strong{font-weight:700;color:var(--text)}
+.subnote{font-family:"JetBrains Mono";font-size:11.5px;color:var(--muted);margin:30px 0 38px;display:flex;gap:13px;flex-wrap:wrap;align-items:center}
+.subnote .kbd{border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:7px;padding:4px 9px;color:var(--text-soft)}
+
+.hero-cta{display:flex;gap:13px;flex-wrap:wrap;margin-bottom:58px}
+.btn{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:15px 24px;border-radius:12px;cursor:pointer;
+  transition:transform .2s var(--ease),box-shadow .25s,background .25s,color .2s,border-color .2s;border:1px solid var(--border-2);background:transparent;color:var(--text)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 0 30px -6px var(--glow)}
+.btn:hover{transform:translateY(-2px)}
+.btn.primary:hover{box-shadow:0 0 44px -4px var(--glow)}
+.btn:not(.primary):hover{border-color:var(--accent);color:var(--accent)}
+
+.stat-row{display:flex;gap:0;flex-wrap:wrap}
+.stat{padding:0 30px;border-left:1px solid var(--border)}
+.stat:first-child{padding-left:0;border-left:none}
+.stat .n{font-family:"Bricolage Grotesque";font-weight:700;font-size:48px;letter-spacing:-.03em;line-height:1}
+.stat .n.c{color:var(--accent)}
+.stat .l{font-family:"JetBrains Mono";font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:9px}
+
+.scrollcue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:3;color:var(--faint);font-size:9.5px;letter-spacing:.2em;text-align:center}
+.scrollcue .bar{width:1px;height:40px;background:linear-gradient(var(--accent),transparent);margin:10px auto 0;animation:drop 1.9s infinite}
+@keyframes drop{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+
+/* ---------- SECTION SHELL ---------- */
+section{padding:104px 0;position:relative}
+.sec-head{margin-bottom:52px;max-width:790px}
+.sec-code{display:inline-flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:20px;padding:6px 13px;border:1px solid rgba(200,242,78,.28);background:rgba(200,242,78,.06);border-radius:999px}
+.sec-head h2{font-size:clamp(36px,5vw,62px);font-weight:600;letter-spacing:-.03em;line-height:1.02;margin-bottom:20px}
+.sec-head h2 .accent{color:var(--accent)}
+.sec-head p{color:var(--text-soft);font-size:19px;line-height:1.55}
+.sec-head p code,.sec-head p b{font-family:"JetBrains Mono";font-size:.78em;color:var(--text);background:rgba(255,255,255,.06);padding:2px 7px;border-radius:6px;font-weight:500}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+
+/* ============================================================
+   STRATA — five memory layers as a core sample
+   ============================================================ */
+.strata{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--panel);box-shadow:var(--shadow)}
+.stratum{display:grid;grid-template-columns:132px 1fr;border-top:1px solid var(--border);position:relative;transition:background .3s var(--ease)}
+.stratum:first-child{border-top:none}
+.stratum:hover{background:color-mix(in srgb,var(--st) 8%,var(--panel))}
+.stratum .depth{position:relative;padding:28px 0 28px 24px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;gap:9px;background:color-mix(in srgb,var(--st) 7%,transparent)}
+.stratum .depth .swatch{width:34px;height:34px;border-radius:10px;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--st) 90%,white),var(--st));box-shadow:0 0 22px -4px var(--st)}
+.stratum .depth .dcap{font-size:8.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.14em}
+.stratum .depth .dval{font-size:13px;color:var(--st);font-weight:700;line-height:1.1}
+.stratum .depth .didx{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em}
+.stratum .body{padding:26px 30px}
+.stratum .srow1{display:flex;align-items:baseline;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.stratum h3{font-family:"Bricolage Grotesque";font-size:30px;font-weight:600;letter-spacing:-.02em;color:var(--st);line-height:1}
+.stratum h3 b{font-weight:600;opacity:.65}
+.stratum .squestion{font-size:17px;color:var(--text-soft);font-style:italic}
+.stratum .squestion::before{content:"“"}.stratum .squestion::after{content:"”"}
+.stratum .sdesc{font-size:16.5px;color:var(--text-soft);line-height:1.5;margin:12px 0 14px;max-width:62ch}
+.stratum .sdesc b{color:var(--text);font-weight:600}
+.stratum .sdesc em{color:var(--st);font-style:normal;font-weight:600}
+.stratum .ex{display:inline-flex;align-items:center;gap:9px;font-size:12px;color:var(--text-soft);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:9px;padding:7px 12px;margin-bottom:15px}
+.stratum .ex::before{content:"e.g.";color:var(--st);font-weight:700}
+.stratum .swhere{font-family:"JetBrains Mono";font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:13px}
+.stratum .swhere b{color:var(--text-soft);text-transform:uppercase;letter-spacing:.1em;font-size:9px;font-weight:700}
+.stratum .stools{display:flex;gap:7px;flex-wrap:wrap}
+.stratum .stool{font-size:10.5px;color:var(--st);border:1px solid color-mix(in srgb,var(--st) 35%,transparent);border-radius:8px;padding:4px 9px;background:color-mix(in srgb,var(--st) 10%,transparent)}
+.stratum .lcount{font-size:10px;color:var(--faint);white-space:nowrap}
+@media(max-width:620px){.stratum{grid-template-columns:80px 1fr}.stratum .depth{padding-left:16px}.stratum h3{font-size:24px}}
+
+/* ============================================================
+   LINEAGE — how agent memory evolved
+   ============================================================ */
+.evo{position:relative;padding-left:30px}
+.evo::before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:linear-gradient(var(--border-2),var(--accent) 92%)}
+.evo-step{position:relative;padding:0 0 38px 34px}
+.evo-step:last-child{padding-bottom:0}
+.evo-step::before{content:"";position:absolute;left:-30px;top:5px;width:16px;height:16px;border-radius:50%;background:var(--panel);border:2px solid var(--border-2);transition:.3s}
+.evo-step.now::before{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 5px rgba(200,242,78,.16),0 0 18px var(--accent)}
+.evo-year{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:7px;display:flex;gap:12px;align-items:center}
+.evo-year .who{color:var(--muted)}
+.evo-step h3{font-family:"Bricolage Grotesque";font-size:25px;font-weight:600;letter-spacing:-.02em;margin-bottom:7px}
+.evo-step h3 em{font-style:normal;color:var(--accent)}
+.evo-step p{font-size:16.5px;color:var(--text-soft);line-height:1.5;max-width:64ch}
+.evo-step p b{color:var(--text);font-weight:600}
+.evo-step.now{padding:24px 26px 24px 34px;background:linear-gradient(180deg,rgba(200,242,78,.06),rgba(255,255,255,.012));border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);box-shadow:var(--shadow)}
+.evo-step.now::before{left:-30px;top:28px}
+
+/* ============================================================
+   FLOW DIAGRAM ENGINE
+   ============================================================ */
+.plate{position:relative;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--panel);padding:30px;overflow:hidden;box-shadow:var(--shadow)}
+.plate::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:30px 30px;mask-image:radial-gradient(circle at 50% 36%,#000,transparent 86%)}
+.dia-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:6px;position:relative;z-index:2}
+.dia-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.dia-title b{color:var(--text);font-weight:700}
+.play{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:9px 15px;border-radius:10px;border:1px solid var(--border-2);background:rgba(255,255,255,.03);color:var(--text);cursor:pointer;transition:.2s;display:flex;align-items:center;gap:8px}
+.play:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 20px -8px var(--glow)}
+.play .tri{width:0;height:0;border-left:7px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent}
+
+.stage-flag{min-height:24px;font-size:12.5px;color:var(--accent);margin:8px 0 16px;position:relative;z-index:2}
+.stage-flag .step{color:var(--faint);margin-right:12px}
+
+.flow-stage{position:relative;width:100%;z-index:2}
+.flow-stage svg{position:absolute;inset:0;width:100%;height:100%;z-index:1;overflow:visible}
+.edge{stroke:var(--border-2);stroke-width:1.4;fill:none;transition:stroke .35s,stroke-opacity .35s;stroke-opacity:.6}
+.edge.live{stroke:var(--accent);stroke-opacity:1;stroke-width:1.8;filter:drop-shadow(0 0 5px var(--glow))}
+
+.node{position:absolute;transform:translate(-50%,-50%);z-index:3;border:1px solid var(--border-2);border-radius:12px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));padding:11px 14px;min-width:96px;text-align:center;
+  transition:transform .3s var(--ease),border-color .3s,box-shadow .35s,opacity .3s}
+.node .nlabel{font-family:"JetBrains Mono";font-size:12px;font-weight:700;color:var(--text);white-space:nowrap}
+.node .nsub{font-family:"JetBrains Mono";font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap}
+.node[data-kind="io"]{border-radius:999px;background:rgba(255,255,255,.04)}
+.node[data-kind="store"]{border-style:dashed}
+.node.dim{opacity:.38}
+.node.active{border-color:var(--accent,var(--accent));box-shadow:0 0 0 1px var(--accent),0 0 30px -4px var(--accent);transform:translate(-50%,-50%) scale(1.06)}
+.node .led{position:absolute;top:-5px;right:-5px;width:9px;height:9px;border-radius:50%;background:var(--accent);opacity:0;box-shadow:0 0 10px var(--accent);transition:opacity .3s}
+.node.active .led{opacity:1;animation:blink 1.1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+.pulse{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px 2px var(--accent);z-index:4;transform:translate(-50%,-50%);pointer-events:none}
+
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:22px;font-size:10.5px;color:var(--muted);position:relative;z-index:2}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{width:11px;height:11px;border-radius:4px;display:inline-block}
+.legend b{color:var(--text);font-weight:700}
+
+/* ============================================================
+   LEDGER (affective)
+   ============================================================ */
+.split{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:start}
+@media(max-width:900px){.split{grid-template-columns:1fr}}
+.ledger{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:#070809;font-family:"JetBrains Mono";font-size:12.5px;box-shadow:var(--shadow)}
+.ledger .lhead{display:flex;align-items:center;gap:9px;padding:13px 18px;border-bottom:1px solid var(--border);color:var(--muted);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+.ledger .lhead .d{width:9px;height:9px;border-radius:50%}
+.ledger pre{padding:20px;overflow-x:auto;line-height:1.8;color:var(--text-soft)}
+.ledger .k{color:#7fb4ff}
+.ledger .s{color:var(--working)}
+.ledger .num{color:var(--procedural)}
+.ledger .c{color:var(--faint)}
+.ledger .hl{color:#fff;font-weight:700;border-bottom:2px solid var(--accent)}
+
+.annot{display:flex;flex-direction:column;gap:13px}
+.acard{border:1px solid var(--border);border-left:3px solid var(--affective);border-radius:var(--r);padding:19px 22px;background:var(--panel);transition:transform .25s var(--ease),box-shadow .25s}
+.acard:hover{transform:translateX(3px);box-shadow:0 0 30px -16px var(--affective)}
+.acard h4{font-family:"Bricolage Grotesque";font-size:21px;font-weight:600;margin-bottom:7px;display:flex;align-items:baseline;gap:12px;letter-spacing:-.01em}
+.acard h4 .tag{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--affective);border:1px solid var(--affective);border-radius:6px;padding:2px 7px}
+.acard p{font-size:16px;color:var(--text-soft);line-height:1.5}
+.acard code{font-family:"JetBrains Mono";font-size:13px;color:var(--text);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px}
+
+/* ============================================================
+   TEMPORAL CORE
+   ============================================================ */
+.tl-card{border:1px solid var(--border);border-radius:var(--r-lg);padding:32px;background:var(--panel);position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.tl-card .dia-title{margin-bottom:10px}
+.tl-axis{position:relative;height:158px;margin:30px 0 12px}
+.tl-line{position:absolute;left:0;right:0;bottom:36px;height:2px;background:var(--border-2)}
+.tl-ticks{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:space-between;font-family:"JetBrains Mono";font-size:10px;color:var(--muted)}
+.tl-fact{position:absolute;height:38px;border-radius:10px;display:flex;align-items:center;padding:0 14px;font-family:"JetBrains Mono";font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid;transition:opacity .25s,filter .25s,box-shadow .25s}
+.tl-fact.factA{bottom:96px;background:color-mix(in srgb,var(--procedural) 14%,var(--panel));border-color:var(--procedural);color:var(--procedural)}
+.tl-fact.factB{bottom:48px;background:color-mix(in srgb,var(--working) 14%,var(--panel));border-color:var(--working);color:var(--working)}
+.tl-fact.dead{opacity:.3;filter:grayscale(.6)}
+.tl-fact.live{box-shadow:0 0 24px -6px currentColor}
+.tl-cursor{position:absolute;top:0;bottom:36px;width:2px;background:var(--accent);box-shadow:0 0 12px var(--accent);transition:left .07s linear}
+.tl-cursor::after{content:"as_of ▾";position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-family:"JetBrains Mono";font-size:10px;color:var(--accent);letter-spacing:.06em;white-space:nowrap}
+.tl-controls{display:flex;align-items:center;gap:18px;margin-top:26px;flex-wrap:wrap}
+.tl-controls input[type=range]{flex:1;min-width:200px;accent-color:var(--accent);height:4px}
+.tl-date{font-size:13px;color:var(--accent);min-width:120px;font-weight:700}
+.tl-result{margin-top:22px;border:1px solid var(--border);border-radius:var(--r);background:#070809;font-family:"JetBrains Mono";font-size:12.5px;padding:18px 20px;line-height:1.8;color:var(--text-soft)}
+.tl-result .q{color:var(--faint)}
+.tl-result .r{color:var(--accent);font-weight:700}
+.tl-foot{font-family:"JetBrains Mono";font-size:11.5px;color:var(--muted);margin-top:18px;max-width:790px;line-height:1.7}
+.tl-foot code{color:var(--text)}
+
+/* ============================================================
+   STORAGE — drawers
+   ============================================================ */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px}
+.drawer{border:1px solid var(--border);border-radius:var(--r);padding:24px;background:var(--panel);position:relative;transition:transform .3s var(--ease),box-shadow .3s,border-color .3s}
+.drawer:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--sc) 50%,var(--border));box-shadow:0 0 40px -22px var(--sc)}
+.drawer::before{content:"";position:absolute;top:20px;right:22px;width:30px;height:6px;border-radius:4px;background:var(--sc);box-shadow:0 0 14px -2px var(--sc)}
+.drawer h3{font-family:"Bricolage Grotesque";font-size:24px;font-weight:600;color:var(--sc);margin-bottom:3px}
+.drawer h3 small{font-family:"JetBrains Mono";font-size:10px;color:var(--faint);font-weight:400}
+.drawer .ssub{font-size:10px;color:var(--muted);margin-bottom:17px;letter-spacing:.08em;text-transform:uppercase}
+.drawer ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.drawer li{font-family:"JetBrains Mono";font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:9px}
+.drawer li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--sc);flex:none}
+.drawer li b{color:var(--text)}
+
+/* ============================================================
+   CATALOGUE
+   ============================================================ */
+.filters{margin-bottom:26px}
+.filter-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.filter-row .flabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-right:4px;flex:none}
+#layerChips{display:flex !important;flex-flow:row wrap;gap:8px;flex:1 1 auto}
+.chip{font-size:11.5px;padding:8px 14px;border-radius:999px;border:1px solid var(--border-2);background:rgba(255,255,255,.03);color:var(--text-soft);cursor:pointer;transition:.18s;display:flex;align-items:center;gap:7px}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--cc,var(--faint));box-shadow:0 0 8px -1px var(--cc,transparent)}
+.chip:hover{color:var(--text);transform:translateY(-1px);border-color:var(--border-2)}
+.chip.on{background:var(--cc);border-color:var(--cc);color:#08090c;font-weight:700;box-shadow:0 0 20px -6px var(--cc)}
+.chip.on i{background:#08090c;box-shadow:none}
+.chip.all.on{background:var(--text);border-color:var(--text);color:#08090c}
+
+.tools-meta{font-family:"JetBrains Mono";font-size:11.5px;color:var(--muted);margin-bottom:20px}
+.tools-meta b{color:var(--accent)}
+
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(288px,1fr));gap:13px}
+.tcard{position:relative;border:1px solid var(--border);border-radius:var(--r);padding:18px 18px 15px;background:var(--panel);transition:transform .22s var(--ease),box-shadow .22s,border-color .22s,opacity .3s;overflow:hidden;border-left:3px solid var(--tc)}
+.tcard:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--tc) 45%,var(--border));box-shadow:0 0 36px -20px var(--tc)}
+.tcard.hide{display:none}
+.tcard .thead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.tcard .tname{font-weight:700;font-size:13.5px;color:var(--text)}
+.tcard .tlayer{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--tc);border:1px solid color-mix(in srgb,var(--tc) 40%,transparent);border-radius:7px;padding:3px 7px;white-space:nowrap;background:color-mix(in srgb,var(--tc) 12%,transparent)}
+.tcard .tdesc{font-size:15.5px;color:var(--text-soft);line-height:1.45;margin-bottom:12px}
+.tcard .tfoot{display:flex;align-items:center;justify-content:flex-end;font-family:"JetBrains Mono";font-size:10px;color:var(--faint)}
+.tcard .tstore{text-transform:uppercase;letter-spacing:.05em}
+
+/* ============================================================
+   COMPARE
+   ============================================================ */
+.cmp-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.cmp{width:100%;border-collapse:collapse;font-size:16px;min-width:560px;background:var(--panel)}
+.cmp th,.cmp td{padding:16px 22px;text-align:left;border-bottom:1px solid var(--border)}
+.cmp tbody tr:last-child td{border-bottom:none}
+.cmp thead th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.03)}
+.cmp tbody tr{transition:background .2s}
+.cmp tbody tr:hover{background:rgba(255,255,255,.03)}
+.cmp td:first-child{font-weight:600}
+.cmp .me{font-family:"Bricolage Grotesque";font-size:19px;color:var(--accent);font-weight:700}
+.cmp .me-row{background:rgba(200,242,78,.06)}
+.cmp .yes{color:var(--working);text-align:center;font-weight:700;font-family:"JetBrains Mono";font-size:13px}
+.cmp .no{color:var(--faint);text-align:center;font-family:"JetBrains Mono"}
+.cmp .partial{color:var(--procedural);text-align:center;font-family:"JetBrains Mono";font-size:13px}
+
+/* ============================================================
+   PRINCIPLES
+   ============================================================ */
+.prin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:13px}
+.prin{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:24px;transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
+.prin:hover{transform:translateY(-3px);border-color:var(--border-2);box-shadow:var(--shadow)}
+.prin .pi{font-family:"JetBrains Mono";font-size:11px;color:var(--accent);letter-spacing:.1em;margin-bottom:14px}
+.prin h3{font-family:"Bricolage Grotesque";font-size:22px;font-weight:600;margin-bottom:9px;letter-spacing:-.02em}
+.prin h3 em{font-style:normal;color:var(--accent)}
+.prin p{font-size:16px;color:var(--text-soft);line-height:1.5}
+.prin code{font-family:"JetBrains Mono";font-size:13px;color:var(--text);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px}
+
+/* ---------- FOOTER ---------- */
+footer{border-top:1px solid var(--border);padding:62px 0 54px;margin-top:48px;background:var(--bg-1)}
+.foot-grid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:36px;align-items:flex-start}
+footer .colophon{max-width:400px}
+footer .ftitle{font-family:"Bricolage Grotesque";font-size:27px;font-weight:600;margin-bottom:14px;letter-spacing:-.02em}
+footer p{color:var(--muted);font-size:16.5px;line-height:1.55}
+footer .meta{font-family:"JetBrains Mono";font-size:11.5px;color:var(--muted);line-height:2.05}
+footer .meta b{color:var(--text);font-weight:700}
+.fnote{margin-top:44px;font-family:"JetBrains Mono";font-size:10.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+@media(max-width:680px){
+  body{font-size:16.5px}
+  .wrap{padding:0 18px}
+  nav{padding:10px 12px}
+  section{padding:76px 0}
+  .plate,.tl-card{padding:20px}
+  .stat{padding:0 18px}
+}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- ============ NAV ============ -->
+<nav>
+  <a class="brand" href="#top">
+    <span class="seal">d</span>
+    <span><span class="bname">devlog-mcp</span><small>Agent Memory</small></span>
+  </a>
+  <div class="navlinks">
+    <a href="#strata">Layers</a>
+    <a href="#lineage">Lineage</a>
+    <a href="#loop">Loop</a>
+    <a href="#affective">Affective</a>
+    <a href="#temporal">Temporal</a>
+    <a href="#storage">Storage</a>
+    <a href="#tools">Catalogue</a>
+    <a class="pill" href="https://github.com/byPawel/tachibot-mcp">TachiBot →</a>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero" id="top">
+  <canvas id="graph"></canvas>
+  <div class="wrap">
+    <div class="eyebrow fade" style="animation-delay:.05s"><span class="dot"></span> <b>Agent-Memory MCP Server</b> · @devlog-mcp/core</div>
+    <h1 class="title fade" style="animation-delay:.15s">An agent that<span class="light"><span class="accent">remembers.</span></span></h1>
+    <p class="lede fade" style="animation-delay:.3s"><strong>devlog-mcp</strong> is a persistent brain for your LLM agent — <em>five memory layers</em>, each answering a different question, so the agent recalls <em>the right kind</em> of memory instead of the most textually similar one.</p>
+    <p class="lede fade" style="animation-delay:.42s">Working · episodic · semantic · procedural · affective — with bi-temporal facts and a track record of which tools to trust.</p>
+    <p class="subnote fade" style="animation-delay:.55s"><span class="kbd">SQLite + LanceDB</span> built on the MCP TypeScript SDK <span class="kbd">MIT</span> byPawel/devlog-mcp</p>
+
+    <div class="hero-cta fade" style="animation-delay:.66s">
+      <a class="btn primary" href="#strata">Explore the layers →</a>
+      <a class="btn" href="#lineage">How memory evolved</a>
+    </div>
+
+    <div class="stat-row fade" style="animation-delay:.78s">
+      <div class="stat"><div class="n c">5</div><div class="l">Memory layers</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">Storage backends</div></div>
+      <div class="stat"><div class="n">28</div><div class="l">MCP tools</div></div>
+      <div class="stat"><div class="n">2</div><div class="l">Native edges*</div></div>
+    </div>
+  </div>
+  <div class="scrollcue">SCROLL<div class="bar"></div></div>
+</header>
+
+<!-- ============ STRATA ============ -->
+<section id="strata">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 01 — The Five Layers</div>
+      <h2>Memory, separated <span class="accent">by function</span></h2>
+      <p>Most memory plugins dump everything into one vector store and retrieve by fuzzy similarity. devlog-mcp follows the <b>CoALA</b> taxonomy used by Letta, Zep and Mem0: each layer owns a different question, a storage home, and its own tools — so the agent fetches the <em>right kind</em> of memory, not the most textually similar one. Each layer is also <em>retained for a different span</em> — from a single task to all-time.</p>
+    </div>
+    <div class="strata reveal" id="strataCol"></div>
+  </div>
+</section>
+
+<!-- ============ LINEAGE ============ -->
+<section id="lineage">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 02 — The Lineage</div>
+      <h2>How agent memory <span class="accent">evolved</span></h2>
+      <p>Agent memory has moved through four generations — from no memory at all, to one big similarity bucket, to tiered OS-like memory, to temporal graphs. devlog-mcp sits at the current edge: function-separated layers, bi-temporal facts, and an affective layer that learns which tools to trust.</p>
+    </div>
+    <div class="evo reveal">
+      <div class="evo-step">
+        <div class="evo-year">Gen 0 · 2022–23 <span class="who">— the bare LLM</span></div>
+        <h3>The context window <em>was</em> the memory</h3>
+        <p>An agent's only memory was its prompt — wiped at the end of every session. It re-learned the codebase, re-discovered decisions, and repeated tools that had already failed. Nothing persisted.</p>
+      </div>
+      <div class="evo-step">
+        <div class="evo-year">Gen 1 · 2023 <span class="who">— Mem0, early RAG</span></div>
+        <h3>One vector store, <em>retrieve by similarity</em></h3>
+        <p>"Memory" became a single embedding index: dump everything in, pull back the most textually similar chunks. Useful, but <b>undifferentiated</b> — a stale plan, a one-off fact and a failed-tool note all compete in the same fuzzy ranking.</p>
+      </div>
+      <div class="evo-step">
+        <div class="evo-year">Gen 2 · 2023–24 <span class="who">— MemGPT / Letta</span></div>
+        <h3>Tiered, <em>OS-like</em> memory</h3>
+        <p>Borrowing from virtual memory: a small in-context "core" plus a large archival store the agent <b>pages in and self-edits</b>. Structure arrives — but the tiers are about <em>size and recency</em>, not about what kind of thing is being remembered.</p>
+      </div>
+      <div class="evo-step">
+        <div class="evo-year">Gen 3 · 2024 <span class="who">— Zep / Graphiti</span></div>
+        <h3>The <em>temporal</em> knowledge graph</h3>
+        <p>Facts became first-class and time-aware: entities and relations with <b>validity windows</b>, so you can ask what the graph believed at a past moment instead of overwriting history. Memory gains a timeline.</p>
+      </div>
+      <div class="evo-step now">
+        <div class="evo-year">Gen 4 · 2025 <span class="who">— devlog-mcp</span></div>
+        <h3>Function-separated <em>+ affective</em></h3>
+        <p>devlog-mcp keeps the temporal graph (bi-temporal relations) and adds two moves no popular OSS lib makes together: memory split into <b>five purpose-built layers</b> (CoALA), and an <b>affective layer</b> that records every tool outcome and turns it into a routing policy — so the agent learns <em>which tools and models to trust</em>, not just what it once saw.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SESSION LOOP ============ -->
+<section id="loop">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 03 — The Method</div>
+      <h2>The session <span class="accent">loop</span></h2>
+      <p>The server stores and serves; the agent reads and writes. A Claude Code session forms a loop across the layers — resume informed, act, reflect, and persist what was learned for next time.</p>
+    </div>
+    <div class="plate reveal" id="dia-loop">
+      <div class="dia-top">
+        <div class="dia-title">CYCLE · <b>resume</b> → orient → act → reflect → route → <b>persist</b></div>
+        <button class="play"><span class="tri"></span> Replay</button>
+      </div>
+      <div class="stage-flag"><span class="step">—</span><span class="cap">Press replay to trace a session across the layers</span></div>
+      <div class="flow-stage" style="height:400px"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i> active path</span>
+        <span><i style="background:var(--working)"></i> working</span>
+        <span><i style="background:var(--episodic)"></i> episodic</span>
+        <span><i style="background:var(--semantic)"></i> semantic</span>
+        <span><i style="background:var(--affective)"></i> affective</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AFFECTIVE ============ -->
+<section id="affective">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 04 — The Distinguishing Trait</div>
+      <h2>Affective memory — <span class="accent">learning what to trust</span></h2>
+      <p>Every tool outcome is recorded; the agent asks <code>devlog_feedback_route</code> for a <b>ranked</b> track record and biases itself accordingly. No other popular OSS memory library — Mem0, Letta, Zep, Cognee, LangMem — does this natively.</p>
+    </div>
+    <div class="plate reveal" id="dia-affective" style="margin-bottom:22px">
+      <div class="dia-top">
+        <div class="dia-title">PIPELINE · <b>feedback_record</b> → ranked <b>feedback_route</b></div>
+        <button class="play"><span class="tri"></span> Replay</button>
+      </div>
+      <div class="stage-flag"><span class="step">—</span><span class="cap">Outcomes become a routing policy</span></div>
+      <div class="flow-stage" style="height:170px"></div>
+      <div class="legend"><span>Outcome &amp; latency captured <b>automatically</b>; confidence recorded <b>when provided</b></span></div>
+    </div>
+    <div class="split reveal">
+      <div class="ledger">
+        <div class="lhead"><span class="d" style="background:var(--affective)"></span> devlog_feedback_route · ranked scores</div>
+<pre><span class="c"># MCP tools/call — ranked routing for this agent</span>
+{
+  <span class="k">"name"</span>: <span class="s">"devlog_feedback_route"</span>,
+  <span class="k">"arguments"</span>: {
+    <span class="k">"agent_id"</span>: <span class="s">"claude-code"</span>,
+    <span class="k">"half_life_days"</span>: <span class="num">14</span>
+  }
+}
+
+<span class="hl">devlog_session_recall</span>
+  n=<span class="num">89</span>  decayed_rate=<span class="num">1.000</span>
+  wilson_lower=<span class="num">0.9583</span>  confident=<span class="s">true</span>
+<span class="hl">devlog_entity_extract_deep</span>
+  n=<span class="num">142</span> success=<span class="num">125</span> timeout=<span class="num">15</span>
+  wilson_lower=<span class="num">0.8213</span>  confident=<span class="s">true</span></pre>
+      </div>
+      <div class="annot">
+        <div class="acard">
+          <h4>Wilson lower bound <span class="tag">rank</span></h4>
+          <p>Ranking uses a <b>Wilson lower bound</b> on the success rate — a single lucky success can't outrank a long, proven record. The agent prefers the higher <code>wilson_lower</code>.</p>
+        </div>
+        <div class="acard">
+          <h4>Recency decay <span class="tag">half-life</span></h4>
+          <p>Stale failures fade via <code>half_life_days</code> — an outcome from three months ago counts for less than one from yesterday.</p>
+        </div>
+        <div class="acard">
+          <h4>Confidence gate <span class="tag">sample size</span></h4>
+          <p>A <code>confident</code> flag flips true only once a tool clears the minimum sample size. Raw aggregates stay in <code>devlog_feedback_query</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BI-TEMPORAL ============ -->
+<section id="temporal">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 05 — Time Travel</div>
+      <h2>Bi-temporal <span class="accent">facts</span></h2>
+      <p>Every <code>entity_relations</code> row carries <code>valid_from</code> / <code>valid_to</code> (Zep / Graphiti-style). Facts are never destructively overwritten — a superseded fact has its window <b>closed</b> and a new slice opens. Drag <code>as_of</code> to query the graph at any point in time.</p>
+    </div>
+    <div class="tl-card reveal">
+      <div class="dia-title">ENTITY · <b>auth/session.ts</b> &nbsp;—[uses]→&nbsp; ?</div>
+      <div class="tl-axis">
+        <div class="tl-fact factA" id="factA" style="left:2%;width:46%">uses → stateful-sessions</div>
+        <div class="tl-fact factB" id="factB" style="left:48%;width:50%">uses → jwt-stateless-tokens</div>
+        <div class="tl-line"></div>
+        <div class="tl-cursor" id="tlCursor" style="left:70%"></div>
+        <div class="tl-ticks"><span>Jan '26</span><span>Mar</span><span>Apr</span><span>Jun</span><span>now</span></div>
+      </div>
+      <div class="tl-controls">
+        <span class="tl-date" id="tlDate">2026-05-12</span>
+        <input type="range" id="tlSlider" min="0" max="100" value="70" aria-label="as_of date">
+      </div>
+      <div class="tl-result" id="tlResult"></div>
+    </div>
+    <p class="tl-foot reveal">Window-closing on supersession is active for <b style="color:var(--text)">single-valued</b> relations; genuinely many-valued relations like <code>depends_on</code> accumulate concurrent open facts instead of evicting each other. History is never deleted — it only stops surfacing in the default "now" view.</p>
+  </div>
+</section>
+
+<!-- ============ STORAGE ============ -->
+<section id="storage">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 06 — Persistence</div>
+      <h2>Three backends, <span class="accent">each to its strength</span></h2>
+      <p>Structured data in SQLite, vectors in LanceDB, human-readable state on the filesystem. Hybrid search fuses FTS5 + vectors by Reciprocal Rank Fusion; an optional local LLM (Ollama) adds embeddings and deep extraction — the server runs fine without it.</p>
+    </div>
+    <div class="store-grid">
+      <div class="drawer reveal" style="--sc:var(--storage)">
+        <h3>SQLite <small>· structured</small></h3>
+        <div class="ssub">Drizzle ORM</div>
+        <ul>
+          <li><b>docs</b> · entities · <b>entity_relations</b></li>
+          <li>sessions · time_entries</li>
+          <li>tags · doc_tags · doc_entities</li>
+          <li>conversation_summaries</li>
+          <li><b>agent_feedback</b> (affective)</li>
+          <li>FTS5 full-text index</li>
+        </ul>
+      </div>
+      <div class="drawer reveal" style="--sc:var(--semantic)">
+        <h3>LanceDB <small>· vectors</small></h3>
+        <div class="ssub">semantic recall</div>
+        <ul>
+          <li><b>doc_vectors</b> + chunks</li>
+          <li>512-token windows, 128 overlap</li>
+          <li>nomic-embed-text embeddings</li>
+          <li>cosine similarity recall</li>
+          <li>RRF-fused with FTS5</li>
+        </ul>
+      </div>
+      <div class="drawer reveal" style="--sc:var(--working)">
+        <h3>Filesystem <small>· readable</small></h3>
+        <div class="ssub">working state</div>
+        <ul>
+          <li><b>current-workspace.md</b></li>
+          <li>daily/*.md session logs</li>
+          <li>plans/*.json (procedural)</li>
+          <li>questions.json</li>
+          <li>assets/* · lock.json</li>
+        </ul>
+      </div>
+      <div class="drawer reveal" style="--sc:var(--procedural)">
+        <h3>Ollama <small>· optional</small></h3>
+        <div class="ssub">graceful fallback</div>
+        <ul>
+          <li>nomic-embed-text → embeddings</li>
+          <li>llama3.2 → deep extraction</li>
+          <li>without it: regex extraction</li>
+          <li>incremental SHA-256 indexing</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BRIDGE ============ -->
+<section id="bridge">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 07 — The Companion</div>
+      <h2>The tachibot <span class="accent">bridge</span></h2>
+      <p><a href="https://github.com/byPawel/tachibot-mcp" style="color:var(--accent);border-bottom:1px solid var(--accent)">tachibot-mcp</a> does the thinking; devlog remembers it. Three opt-in bridge tools (<code>DEVLOG_ENABLE_TACHIBOT_BRIDGE=true</code>) land each model's stateless output in the right layer — and feed it back into the next decision.</p>
+    </div>
+    <div class="plate reveal" id="dia-bridge">
+      <div class="dia-top">
+        <div class="dia-title">LOOP · tachibot reasons → devlog remembers → context flows back</div>
+        <button class="play"><span class="tri"></span> Replay</button>
+      </div>
+      <div class="stage-flag"><span class="step">—</span><span class="cap">Stop re-researching what you already looked up</span></div>
+      <div class="flow-stage" style="height:340px"></div>
+      <div class="legend">
+        <span><i style="background:var(--semantic)"></i> → semantic (LanceDB)</span>
+        <span><i style="background:var(--procedural)"></i> → procedural (plans)</span>
+        <span><i style="background:var(--working)"></i> context back to tachibot</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CATALOGUE ============ -->
+<section id="tools">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 08 — The Catalogue</div>
+      <h2>Every tool, <span class="accent">by layer</span></h2>
+      <p>Filter the toolset by the memory layer it reads or writes. Core tools ship on <code>core-server.js</code>; analytics and bridge tools register on their own servers.</p>
+    </div>
+    <div class="filters reveal">
+      <div class="filter-row">
+        <span class="flabel">Layer</span>
+        <div id="layerChips"></div>
+      </div>
+    </div>
+    <div class="tools-meta reveal">Showing <b id="toolCount">0</b> of 28 entries</div>
+    <div class="tool-grid" id="toolGrid"></div>
+  </div>
+</section>
+
+<!-- ============ COMPARE ============ -->
+<section id="compare">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 09 — The Survey</div>
+      <h2>How it <span class="accent">compares</span></h2>
+      <p>Two capabilities set devlog-mcp apart, and both are queryable as plain MCP tool calls.</p>
+    </div>
+    <div class="cmp-wrap reveal">
+      <table class="cmp">
+        <thead>
+          <tr><th>Project</th><th>Architecture</th><th style="text-align:center">Native temporal</th><th style="text-align:center">Native affective</th></tr>
+        </thead>
+        <tbody>
+          <tr class="me-row"><td class="me">devlog-mcp</td><td>SQLite + LanceDB + entity graph</td><td class="yes">✓ bi-temporal</td><td class="yes">✓ agent_feedback</td></tr>
+          <tr><td>Mem0</td><td>Vector + optional graph</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Letta (MemGPT)</td><td>Tiered, OS-like, self-editing</td><td class="partial">◐ via metadata</td><td class="partial">◐ via metadata</td></tr>
+          <tr><td>Zep / Graphiti</td><td>Temporal knowledge graph</td><td class="yes">✓ bi-temporal</td><td class="no">—</td></tr>
+          <tr><td>Cognee</td><td>Graph + vector poly-store</td><td class="partial">◐ partial</td><td class="no">—</td></tr>
+          <tr><td>LangMem</td><td>Modular over LangGraph</td><td class="no">—</td><td class="no">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRINCIPLES ============ -->
+<section id="arch">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 10 — Under the Hood</div>
+      <h2>How it <span class="accent">holds together</span></h2>
+      <p>Layer-driven, gracefully degrading, and built on the MCP TypeScript SDK.</p>
+    </div>
+    <div class="prin-grid">
+      <div class="prin reveal"><div class="pi">i · TAXONOMY</div><h3>Function-<em>separated</em> memory</h3><p>Five layers along the CoALA taxonomy — the agent retrieves the right <em>kind</em> of memory, not the most similar text.</p></div>
+      <div class="prin reveal"><div class="pi">ii · TEMPORAL</div><h3>Non-destructive facts</h3><p>Supersession closes a fact's <code>valid_to</code> window and opens a new slice. <code>as_of</code> replays the graph at any moment.</p></div>
+      <div class="prin reveal"><div class="pi">iii · AFFECTIVE</div><h3>Outcomes as <em>policy</em></h3><p>Wilson lower bound + recency decay turn per-tool records into a routing signal the agent can trust.</p></div>
+      <div class="prin reveal"><div class="pi">iv · STORAGE</div><h3>Right tool per job</h3><p>SQLite for structure, LanceDB for vectors, files for human-readable state — fused by Reciprocal Rank Fusion.</p></div>
+      <div class="prin reveal"><div class="pi">v · DEGRADE</div><h3>Runs <em>without</em> Ollama</h3><p>No local LLM? Regex extraction takes over and recall falls back to recency. Nothing hard-fails.</p></div>
+      <div class="prin reveal"><div class="pi">vi · BRIDGE</div><h3>Zero cost when off</h3><p>Three opt-in tools wire tachibot's multi-model output into memory. Disabled by default.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="colophon">
+        <div class="ftitle">An agent that remembers.</div>
+        <p>The agent never holds it all in context — it pulls the slice it needs from the layer that owns it, then writes back what it learned. The server stores and serves; the agent reads and writes.</p>
+      </div>
+      <div class="meta">
+        <b>PACKAGE</b><br>@devlog-mcp/core · v0.1.0<br><br>
+        <b>BUILT ON</b><br>MCP TypeScript SDK<br><br>
+        <b>LICENSE</b><br>MIT
+      </div>
+      <div class="meta">
+        <b>LAYERS</b><br>
+        Working · Episodic<br>Semantic · Procedural<br>Affective<br><br>
+        <b>STORAGE</b><br>SQLite · LanceDB<br>Filesystem · Ollama
+      </div>
+    </div>
+    <div class="fnote">
+      <span>A generated guide · interactive architecture map &nbsp;·&nbsp; *native edges = bi-temporal + affective</span>
+      <span>github.com/byPawel/devlog-mcp</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   DATA — memory layers (static, author-controlled)
+   ============================================================ */
+const LAYERS = {
+  working:{label:"Working", color:"var(--working)", life:"this task", idx:"layer i",
+    q:"What am I doing right now?",
+    desc:"The agent's scratchpad for the task in hand — plus a <b>file-lock</b> so two agents don't trample each other. Like RAM: fast, current, and cleared when the task ends.",
+    ex:"claimed: auth-refactor · open Q: needs a regression test",
+    where:"current-workspace.md · sessions(active) · questions.json"},
+  episodic:{label:"Episodic", color:"var(--episodic)", life:"per session", idx:"layer ii",
+    q:"What happened last time?",
+    desc:"A dated <b>diary of past sessions</b>, written at session end and auto-compacted as it grows. A fresh session resumes days later instead of re-investigating from scratch.",
+    ex:"Mon — fixed race in session refresh; partial fix in auth/session.ts",
+    where:"sessions · time_entries · conversation_summaries"},
+  semantic:{label:"Semantic", color:"var(--semantic)", life:"permanent", idx:"layer iii",
+    q:"Have I seen this entity before?",
+    desc:"The <b>knowledge graph</b>: entities (files, services, decisions) and how they relate, plus document vectors. Answers by <em>meaning</em>, not text match — and every relation is bi-temporal.",
+    ex:"auth/session.ts —uses→ jwt-stateless-tokens",
+    where:"entities · entity_relations · doc_vectors (LanceDB)"},
+  procedural:{label:"Procedural", color:"var(--procedural)", life:"per plan", idx:"layer iv",
+    q:"What plan am I executing?",
+    desc:"The <b>plans and checklists</b> the agent is working through, with progress and blockers. Knowing “where am I in the plan” survives the context window.",
+    ex:"plan auth-hardening · 3/7 done · task 4 blocked",
+    where:"docs(doc_type='plan') · plans/*.json"},
+  affective:{label:"Affective", color:"var(--affective)", life:"all-time", idx:"layer v",
+    q:"Does this tool usually work?",
+    desc:"A per-tool, per-agent <b>track record</b> — success, failure, latency, confidence. Wilson-ranked and recency-decayed into a routing policy the agent can actually trust.",
+    ex:"entity_extract_deep · 88% success · prefer over regex",
+    where:"agent_feedback"},
+  other:{label:"Setup", color:"var(--faint)", q:"Init &amp; assets", where:"db bootstrap · assets/*"},
+  bridge:{label:"Bridge", color:"var(--accent)", q:"tachibot ↔ devlog", where:"opt-in · DEVLOG_ENABLE_TACHIBOT_BRIDGE"}
+};
+
+const TOOLS = [
+  {n:"devlog_workspace_status", l:"working",  st:"file + sqlite", d:"Check workspace status and active sessions."},
+  {n:"devlog_workspace_claim",  l:"working",  st:"file lock",     d:"Claim the workspace with a file-based lock so two agents don't collide."},
+  {n:"devlog_workspace_dump",   l:"working",  st:"→ sqlite",      d:"Flush the active workspace into durable storage; registers docs in SQLite."},
+  {n:"devlog_session_log",      l:"working",  st:"file + sqlite", d:"Log development session entries with tags as work happens."},
+  {n:"devlog_question_add",     l:"working",  st:"questions.json",d:"Record an open question during development."},
+  {n:"devlog_question_answer",  l:"working",  st:"questions.json",d:"Answer a previously logged question."},
+  {n:"devlog_question_list",    l:"working",  st:"questions.json",d:"List all tracked questions."},
+  {n:"devlog_question_check",   l:"working",  st:"questions.json",d:"Check the status of open questions."},
+  {n:"devlog_session_recall",   l:"episodic", st:"sqlite + vec",  d:"Read past session summaries — filter by query, session_id, since; semantically re-ranked."},
+  {n:"devlog_session_summary_add",l:"episodic",st:"sqlite",       d:"Write a session-end summary; auto-compacted past the token budget."},
+  {n:"devlog_compress_week",    l:"episodic", st:"analytics srv", d:"Generate a compressed weekly summary — sessions, decisions, mermaid charts."},
+  {n:"devlog_entity_graph",     l:"semantic", st:"sqlite (CTE)",  d:"Search or traverse the entity graph. Accepts as_of for point-in-time bi-temporal queries."},
+  {n:"devlog_entity_extract_deep",l:"semantic",st:"ollama",       d:"LLM-powered deep extraction on a document via Ollama (llama3.2)."},
+  {n:"devlog_plan_create",      l:"procedural",st:"plans/*.json", d:"Create a development plan with tasks."},
+  {n:"devlog_plan_check",       l:"procedural",st:"plans/*.json", d:"Check progress on a plan's tasks."},
+  {n:"devlog_plan_blocker",     l:"procedural",st:"plans/*.json", d:"Report a blocker on a plan task."},
+  {n:"devlog_plan_validate",    l:"procedural",st:"plans/*.json", d:"Validate plan completion criteria."},
+  {n:"devlog_plan_status",      l:"procedural",st:"plans/*.json", d:"Get an overall plan status summary."},
+  {n:"devlog_plan_list",        l:"procedural",st:"plans/*.json", d:"List all plans."},
+  {n:"devlog_feedback_record",  l:"affective",st:"agent_feedback",d:"Record a tool-call outcome (success / failure / partial / rejected / timeout) with confidence + latency."},
+  {n:"devlog_feedback_route",   l:"affective",st:"agent_feedback",d:"Ranked track record — Wilson lower bound + recency decay turn outcomes into a routing policy."},
+  {n:"devlog_feedback_query",   l:"affective",st:"agent_feedback",d:"Raw per-tool success rates, recent failures, agent-specific stats."},
+  {n:"devlog_init",             l:"other",    st:"bootstrap",     d:"Initialize the devlog workspace and database."},
+  {n:"devlog_save_image",       l:"other",    st:"assets/*",      d:"Save an image asset (base64 or URL)."},
+  {n:"devlog_save_file",        l:"other",    st:"assets/*",      d:"Save a file asset."},
+  {n:"devlog_list_assets",      l:"other",    st:"assets/*",      d:"List saved assets."},
+  {n:"bridge_index_research",   l:"bridge",   st:"→ lancedb",     d:"Index tachibot research output into LanceDB. Deterministic IDs replace stale entries — no duplicates."},
+  {n:"bridge_import_plan",      l:"bridge",   st:"→ plans",       d:"Import planner_maker phases into devlog plans, usable by plan_check / _validate / _status."},
+  {n:"bridge_get_context",      l:"bridge",   st:"sqlite + vec",  d:"Pull relevant prior research + plans as a paste-ready context block to seed the next reasoning call."}
+];
+
+/* ---- RENDER strata ---- */
+(function(){
+  const col=document.getElementById("strataCol");
+  const order=["working","episodic","semantic","procedural","affective"];
+  const counts={};TOOLS.forEach(t=>counts[t.l]=(counts[t.l]||0)+1);
+  order.forEach(k=>{
+    const L=LAYERS[k];const tools=TOOLS.filter(t=>t.l===k).slice(0,5);
+    const row=document.createElement("div");row.className="stratum";row.style.setProperty("--st",L.color);
+    row.innerHTML=`
+      <div class="depth"><span class="swatch"></span><span class="dcap">retained</span><span class="dval">${L.life}</span><span class="didx">${L.idx}</span></div>
+      <div class="body">
+        <div class="srow1"><h3>${L.label} <b>memory</b></h3><span class="lcount">${counts[k]||0} tools</span></div>
+        <div class="squestion">${L.q}</div>
+        <div class="sdesc">${L.desc}</div>
+        <div class="ex">${L.ex}</div>
+        <div class="swhere"><b>Lives in</b> &nbsp;${L.where}</div>
+        <div class="stools">${tools.map(t=>`<span class="stool">${t.n.replace('devlog_','')}</span>`).join("")}</div>
+      </div>`;
+    col.appendChild(row);
+  });
+})();
+
+/* ---- RENDER catalogue + filter ---- */
+(function(){
+  const chips=document.getElementById("layerChips");const grid=document.getElementById("toolGrid");const countEl=document.getElementById("toolCount");
+  let active="all";
+  const all=document.createElement("button");all.className="chip all on";all.dataset.val="all";all.textContent="All";chips.appendChild(all);
+  ["working","episodic","semantic","procedural","affective","other","bridge"].forEach(k=>{
+    const L=LAYERS[k];const b=document.createElement("button");b.className="chip";b.dataset.val=k;b.style.setProperty("--cc",L.color);b.innerHTML=`<i></i>${L.label}`;chips.appendChild(b);
+  });
+  TOOLS.forEach(t=>{
+    const L=LAYERS[t.l];const card=document.createElement("div");card.className="tcard";card.style.setProperty("--tc",L.color);card.dataset.layer=t.l;
+    card.innerHTML=`<div class="thead"><span class="tname">${t.n}</span><span class="tlayer">${L.label}</span></div><div class="tdesc">${t.d}</div><div class="tfoot"><span class="tstore">${t.st}</span></div>`;
+    grid.appendChild(card);
+  });
+  function apply(){let shown=0;grid.querySelectorAll(".tcard").forEach(c=>{const ok=active==="all"||c.dataset.layer===active;c.classList.toggle("hide",!ok);if(ok)shown++;});countEl.textContent=shown;}
+  chips.addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;chips.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");active=b.dataset.val;apply();});
+  apply();
+})();
+
+/* ============================================================
+   FLOW DIAGRAM ENGINE
+   ============================================================ */
+class FlowDiagram{
+  constructor(root,cfg){this.root=root;this.stageEl=root.querySelector(".flow-stage");this.flag=root.querySelector(".stage-flag");this.nodes=cfg.nodes;this.edges=cfg.edges;this.stages=cfg.stages;this.timers=[];this.build();root.querySelector(".play").addEventListener("click",()=>this.play());}
+  build(){
+    const NS="http://www.w3.org/2000/svg";this.svg=document.createElementNS(NS,"svg");this.stageEl.appendChild(this.svg);this.lines={};
+    this.edges.forEach(e=>{const l=document.createElementNS(NS,"line");l.setAttribute("class","edge");this.svg.appendChild(l);this.lines[e.from+">"+e.to]=l;});
+    this.nodeEls={};
+    this.nodes.forEach(n=>{const d=document.createElement("div");d.className="node";d.dataset.kind=n.kind||"proc";if(n.color)d.style.setProperty("--accent",n.color);d.style.left=n.x+"%";d.style.top=n.y+"%";d.innerHTML=`<span class="led"></span><div class="nlabel">${n.label}</div>${n.sub?`<div class="nsub">${n.sub}</div>`:""}`;this.stageEl.appendChild(d);this.nodeEls[n.id]=d;});
+    this.position();window.addEventListener("resize",()=>this.position());
+  }
+  center(id){const r=this.nodeEls[id].getBoundingClientRect();const s=this.stageEl.getBoundingClientRect();return {x:r.left+r.width/2-s.left,y:r.top+r.height/2-s.top};}
+  position(){this.edges.forEach(e=>{const a=this.center(e.from),b=this.center(e.to);const l=this.lines[e.from+">"+e.to];l.setAttribute("x1",a.x);l.setAttribute("y1",a.y);l.setAttribute("x2",b.x);l.setAttribute("y2",b.y);});}
+  reset(){this.timers.forEach(clearTimeout);this.timers=[];this.stageEl.querySelectorAll(".pulse").forEach(p=>p.remove());Object.values(this.nodeEls).forEach(n=>{n.classList.remove("active");n.classList.add("dim");});Object.values(this.lines).forEach(l=>l.classList.remove("live"));}
+  pulse(from,to,dur,delay){return new Promise(res=>{const t=setTimeout(()=>{const a=this.center(from),b=this.center(to);const dot=document.createElement("div");dot.className="pulse";this.stageEl.appendChild(dot);const start=performance.now();const step=now=>{const k=Math.min(1,(now-start)/dur);const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;dot.style.left=(a.x+(b.x-a.x)*e)+"px";dot.style.top=(a.y+(b.y-a.y)*e)+"px";if(k<1)requestAnimationFrame(step);else{dot.remove();res();}};requestAnimationFrame(step);},delay);this.timers.push(t);});}
+  play(){if(!this.flag)return;this.position();this.reset();let delay=300;
+    this.stages.forEach((st,idx)=>{const t=setTimeout(()=>{this.flag.innerHTML=`<span class="step">STEP ${idx+1}/${this.stages.length}</span><span class="cap">${st.cap}</span>`;(st.nodes||[]).forEach(id=>{const n=this.nodeEls[id];if(n){n.classList.remove("dim");n.classList.add("active");}});(st.edges||[]).forEach((e,i)=>{const l=this.lines[e[0]+">"+e[1]];if(l)l.classList.add("live");this.pulse(e[0],e[1],700,i*70);});},delay);this.timers.push(t);delay+=st.dur||1150;});
+    const end=setTimeout(()=>{this.flag.innerHTML=`<span class="step">DONE</span><span class="cap">${this.stages[this.stages.length-1].done||"Cycle complete."}</span>`;Object.values(this.nodeEls).forEach(n=>n.classList.remove("dim"));},delay+200);this.timers.push(end);}
+}
+
+const loopCfg={
+  nodes:[
+    {id:"resume", x:22,y:26, label:"1 · RESUME",  sub:"workspace_status · recall", color:"var(--working)"},
+    {id:"orient", x:50,y:14, label:"2 · ORIENT",  sub:"entity_graph · plan_status", color:"var(--semantic)"},
+    {id:"act",    x:78,y:26, label:"3 · ACT",     sub:"claim · session_log",       color:"var(--working)"},
+    {id:"reflect",x:80,y:66, label:"4 · REFLECT", sub:"feedback_record",           color:"var(--affective)"},
+    {id:"route",  x:50,y:86, label:"5 · ROUTE",   sub:"feedback_route",            color:"var(--affective)"},
+    {id:"persist",x:20,y:66, label:"6 · PERSIST", sub:"workspace_dump → episodic", color:"var(--episodic)"}
+  ],
+  edges:[{from:"resume",to:"orient"},{from:"orient",to:"act"},{from:"act",to:"reflect"},{from:"reflect",to:"route"},{from:"route",to:"persist"},{from:"persist",to:"resume"}],
+  stages:[
+    {cap:"Resume — read working + episodic, start informed not blank",nodes:["resume"],edges:[["persist","resume"]],dur:1100},
+    {cap:"Orient — entity_graph + plan_status reveal what's relevant",nodes:["orient"],edges:[["resume","orient"]],dur:1100},
+    {cap:"Act — claim the workspace, log progress, record questions",nodes:["act"],edges:[["orient","act"]],dur:1100},
+    {cap:"Reflect — capture each tool outcome into affective memory",nodes:["reflect"],edges:[["act","reflect"]],dur:1100},
+    {cap:"Route — bias toward the tool that has historically worked",nodes:["route"],edges:[["reflect","route"]],dur:1100},
+    {cap:"Persist — flush the workspace into durable episodic storage",nodes:["persist"],edges:[["route","persist"]],dur:1100,done:"The loop closes — next session resumes from here."}
+  ]
+};
+const affectiveCfg={
+  nodes:[
+    {id:"call", x:6,  y:50, label:"TOOL CALL", kind:"io", color:"var(--accent)"},
+    {id:"out",  x:26, y:50, label:"OUTCOME",   sub:"ok · fail · latency", color:"var(--affective)"},
+    {id:"store",x:46, y:50, label:"agent_feedback", sub:"SQLite row", kind:"store", color:"var(--semantic)"},
+    {id:"decay",x:65, y:50, label:"RECENCY DECAY", sub:"half_life_days", color:"var(--episodic)"},
+    {id:"wilson",x:83,y:50, label:"WILSON BOUND",  sub:"lower-bound rank", color:"var(--working)"},
+    {id:"route",x:97, y:50, label:"ROUTE", kind:"io", color:"var(--accent)"}
+  ],
+  edges:[{from:"call",to:"out"},{from:"out",to:"store"},{from:"store",to:"decay"},{from:"decay",to:"wilson"},{from:"wilson",to:"route"}],
+  stages:[
+    {cap:"Every tool call resolves to an outcome — captured automatically",nodes:["call","out"],edges:[["call","out"]],dur:1000},
+    {cap:"Outcome + latency written to the agent_feedback table",nodes:["store"],edges:[["out","store"]],dur:1000},
+    {cap:"Recency decay fades stale failures by half_life_days",nodes:["decay"],edges:[["store","decay"]],dur:1000},
+    {cap:"Wilson lower bound ranks — luck can't outrank a track record",nodes:["wilson"],edges:[["decay","wilson"]],dur:1000},
+    {cap:"Agent prefers the higher wilson_lower — outcomes become policy",nodes:["route"],edges:[["wilson","route"]],dur:900,done:"Past performance, turned into a routing decision."}
+  ]
+};
+const bridgeCfg={
+  nodes:[
+    {id:"t",   x:50,y:14, label:"tachibot",  sub:"multi-model reasoning", color:"var(--accent)"},
+    {id:"idx", x:17,y:48, label:"index_research", sub:"→ semantic",  color:"var(--semantic)"},
+    {id:"imp", x:83,y:48, label:"import_plan",    sub:"→ procedural",color:"var(--procedural)"},
+    {id:"mem", x:50,y:58, label:"devlog memory",  sub:"LanceDB · plans", kind:"store", color:"var(--episodic)"},
+    {id:"ctx", x:50,y:88, label:"get_context",    sub:"→ back to tachibot", color:"var(--working)"}
+  ],
+  edges:[{from:"t",to:"idx"},{from:"t",to:"imp"},{from:"idx",to:"mem"},{from:"imp",to:"mem"},{from:"mem",to:"ctx"},{from:"ctx",to:"t"}],
+  stages:[
+    {cap:"tachibot reasons, researches and plans across many models",nodes:["t"],edges:[],dur:1000},
+    {cap:"bridge_index_research → semantic · bridge_import_plan → procedural",nodes:["idx","imp"],edges:[["t","idx"],["t","imp"]],dur:1300},
+    {cap:"Each model's stateless output lands in durable memory",nodes:["mem"],edges:[["idx","mem"],["imp","mem"]],dur:1100},
+    {cap:"Next task: bridge_get_context recalls what's relevant",nodes:["ctx"],edges:[["mem","ctx"]],dur:1050},
+    {cap:"Context flows back to seed the next reasoning call",nodes:["t"],edges:[["ctx","t"]],dur:900,done:"Output compounds into shared, queryable memory."}
+  ]
+};
+
+const diagrams=[];
+function initDia(id,cfg){const root=document.getElementById(id);if(root)diagrams.push({root,fd:new FlowDiagram(root,cfg)});}
+initDia("dia-loop",loopCfg);initDia("dia-affective",affectiveCfg);initDia("dia-bridge",bridgeCfg);
+
+/* ---- TEMPORAL slider ---- */
+(function(){
+  const slider=document.getElementById("tlSlider"),cursor=document.getElementById("tlCursor"),dateEl=document.getElementById("tlDate"),result=document.getElementById("tlResult"),factA=document.getElementById("factA"),factB=document.getElementById("factB");
+  if(!slider)return;
+  const start=new Date("2026-01-01").getTime(),end=new Date("2026-08-01").getTime(),cutoverPct=48;
+  const fmt=ts=>new Date(ts).toISOString().slice(0,10);
+  function update(){
+    const pct=+slider.value;cursor.style.left=pct+"%";
+    const iso=fmt(start+(end-start)*(pct/100));dateEl.textContent=iso;
+    const before=pct<cutoverPct;
+    factA.classList.toggle("live",before);factA.classList.toggle("dead",!before);
+    factB.classList.toggle("live",!before);factB.classList.toggle("dead",before);
+    const rel=before?"stateful-sessions":"jwt-stateless-tokens";
+    const closed=before?"open (valid_to = null)":"closed 2026-04-01";
+    result.innerHTML=`<span class="q">devlog_entity_graph { entityId: 7, as_of: "${iso}T00:00:00Z" }</span><br>&nbsp;&nbsp;auth/session.ts &nbsp;--[uses]--&gt;&nbsp; <span class="r">${rel}</span><br><span class="q">&nbsp;&nbsp;stateful-sessions fact: ${closed}</span>`;
+  }
+  slider.addEventListener("input",update);update();
+})();
+
+/* ---- reveal + autoplay ---- */
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(!e.isIntersecting)return;e.target.classList.add("in");io.unobserve(e.target);});},{threshold:.12});
+document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+const dio=new IntersectionObserver(es=>{es.forEach(e=>{if(!e.isIntersecting)return;const d=diagrams.find(x=>x.root===e.target);if(d)setTimeout(()=>d.fd.play(),400);dio.unobserve(e.target);});},{threshold:.3});
+diagrams.forEach(d=>dio.observe(d.root));
+
+/* ---- HERO entity-graph constellation (neon on dark) ---- */
+(function(){
+  const cv=document.getElementById("graph");const ctx=cv.getContext("2d");let W,H,dpr;
+  const tones=["#34e0a1","#5b9dff","#b48cff","#ff9f45","#ff6b7d","#22d3ee","#c8f24e"];
+  let pts=[];
+  function resize(){
+    dpr=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;
+    cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    const n=Math.min(56,Math.floor(W*H/20000));
+    pts=Array.from({length:n},(_,i)=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.24,vy:(Math.random()-.5)*.24,r:Math.random()*1.9+1.2,c:tones[i%tones.length],big:Math.random()<.2}));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const a=pts[i],b=pts[j],dx=a.x-b.x,dy=a.y-b.y,dist=Math.hypot(dx,dy);if(dist<150){ctx.globalAlpha=(1-dist/150)*.16;ctx.strokeStyle="#8b91a8";ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}
+    ctx.globalAlpha=1;
+    pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;const rr=p.big?p.r+1.3:p.r;if(p.big){ctx.shadowColor=p.c;ctx.shadowBlur=16;}else{ctx.shadowBlur=0;}ctx.fillStyle=p.c;ctx.globalAlpha=p.big?.95:.5;ctx.beginPath();ctx.arc(p.x,p.y,rr,0,Math.PI*2);ctx.fill();});
+    ctx.shadowBlur=0;ctx.globalAlpha=1;requestAnimationFrame(draw);
+  }
+  resize();draw();window.addEventListener("resize",resize);
+})();
+</script>
+</body>
+</html>
