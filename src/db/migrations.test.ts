@@ -314,6 +314,21 @@ describe('runMigrations', () => {
     expect(versionsAfter).toBe(versionsBefore);
   });
 
+  it('migration v9 creates shared_blocks with the optimistic-concurrency columns', () => {
+    db.prepare(`CREATE TABLE schema_version (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)`).run();
+    expect(() => runMigrations(db)).not.toThrow();
+    const cols = new Set(
+      (db.prepare(`PRAGMA table_info(shared_blocks)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    for (const c of ['block_key', 'content', 'version', 'updated_by', 'created_at', 'updated_at']) {
+      expect(cols.has(c)).toBe(true);
+    }
+    // block_key is the primary key (one row per key).
+    const pk = (db.prepare(`PRAGMA table_info(shared_blocks)`).all() as Array<{ name: string; pk: number }>)
+      .find((c) => c.name === 'block_key');
+    expect(pk?.pk).toBe(1);
+  });
+
   it('rolls back a failing migration: no version row is recorded', () => {
     runMigrations(db); // apply existing migrations first
     const failingVersion = MIGRATIONS[MIGRATIONS.length - 1].version + 1;

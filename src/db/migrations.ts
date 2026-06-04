@@ -165,6 +165,24 @@ export const MIGRATIONS: Migration[] = [
     ];
     for (const s of statements) db.prepare(s).run();
   } },
+  // v9: shared, EDITABLE blocks (upgrade from append-only shared_notes). Each block
+  // is one row keyed by block_key; concurrent edits are made safe with optimistic
+  // concurrency on `version` (atomic UPDATE ... WHERE block_key=? AND version=?).
+  // Per-project only (one DB file per project); no global/cross-project store.
+  { version: 9, description: 'shared_blocks table for editable multi-agent working memory', up: (db) => {
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS shared_blocks (
+        block_key TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        updated_by TEXT NOT NULL,
+        created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_shared_blocks_updated_at ON shared_blocks(updated_at)`,
+    ];
+    for (const s of statements) db.prepare(s).run();
+  } },
 ];
 
 export function runMigrations(db: Database.Database): void {
