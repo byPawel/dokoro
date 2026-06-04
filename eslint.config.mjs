@@ -57,7 +57,7 @@ export default tseslint.config(
         // reformatting (the de-vendor refactor split the object literals and
         // stranded the disables above the `{`, breaking CI lint). Allow explicit
         // any in just these two files instead.
-        files: ["src/devlog-server.ts", "src/devlog-http-server.ts"],
+        files: ["src/dokoro-server.ts", "src/dokoro-http-server.ts"],
         rules: {
             "@typescript-eslint/no-explicit-any": "off"
         }

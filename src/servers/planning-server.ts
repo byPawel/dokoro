@@ -19,7 +19,7 @@ const planningServerTools: ToolDefinition[] = [
 ];
 
 const config = {
-  name: 'devlog-planning',
+  name: 'dokoro-planning',
   version: '1.0.0',
   description: 'Feature planning and research tools for DevLog'
 };

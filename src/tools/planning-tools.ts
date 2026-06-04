@@ -4,7 +4,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 // renderOutput available for future migration
 // import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';

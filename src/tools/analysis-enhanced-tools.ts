@@ -3,7 +3,7 @@ import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { readFile, readdir } from 'fs/promises';
 import { join, basename } from 'path';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 import matter from 'gray-matter';
 
 interface Pattern {

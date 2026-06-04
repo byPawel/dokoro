@@ -48,7 +48,7 @@ async function freshModule(): Promise<QuestionTools> {
 
 describe('question-tools concurrent writes (BUG-20)', () => {
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devlog-qtools-test-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dokoro-qtools-test-'));
     await fs.mkdir(path.join(tmpDir, '.mcp'), { recursive: true });
     // Point DOKORO_PATH at our temp dir before loading the module
     process.env['DOKORO_PATH'] = tmpDir;

@@ -54,7 +54,7 @@ async function searchDevlogs(query: string, type: string = 'all') {
 // Create DevLog MCP server
 const getDevLogServer = () => {
   const server = new McpServer({
-    name: 'mcp-devlog-http',
+    name: 'mcp-dokoro-http',
     version: '2.0.0',
     description: 'DevLog MCP server (HTTP mode) for development insights'
   }, {

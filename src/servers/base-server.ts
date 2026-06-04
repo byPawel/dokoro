@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ToolDefinition, registerTools } from '../tools/registry.js';
 import { withToolTracking } from '../utils/tool-tracker.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import { promises as fs } from 'fs';
 import path from 'node:path';
 import { getSqliteDb } from '../db/index.js';

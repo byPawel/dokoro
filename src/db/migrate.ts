@@ -67,7 +67,7 @@ interface ParsedMarkdown {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const IGNORED_FOLDERS = [".mcp", ".obsidian", ".private", ".tags", ".git", "node_modules", ".devlog", ".devlog-backup"];
+const IGNORED_FOLDERS = [".mcp", ".obsidian", ".private", ".tags", ".git", "node_modules", ".devlog", ".dokoro-backup"];
 
 const STATUS_MAP: Record<string, string> = {
   done: "done",

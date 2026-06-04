@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { searchDevlogs } from '../utils/search.js';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 

@@ -1,5 +1,5 @@
 /**
- * Bridge Tools - Connects tachibot-mcp outputs to devlog-mcp persistence
+ * Bridge Tools - Connects tachibot-mcp outputs to dokoro-mcp persistence
  *
  * Three tools:
  * - bridge_index_research: Index tachibot research into LanceDB

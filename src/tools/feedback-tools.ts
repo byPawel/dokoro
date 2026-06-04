@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { getSqliteDb } from '../db/index.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import * as path from 'node:path';
 
 function getSqlite(): Database.Database {

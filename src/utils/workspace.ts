@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { WorkspaceInfo, AgentInfo, DOKORO_PATH } from '../types/devlog.js';
+import { WorkspaceInfo, AgentInfo, DOKORO_PATH } from '../types/dokoro.js';
 
 /**
  * Generate a unique agent ID with collision detection

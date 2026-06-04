@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { globSync } from 'glob';
 import { parseDevlogContent } from './parsing.js';
-import { SearchResult, DOKORO_PATH } from '../types/devlog.js';
+import { SearchResult, DOKORO_PATH } from '../types/dokoro.js';
 
 /**
  * Read a devlog file

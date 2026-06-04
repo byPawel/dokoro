@@ -8,7 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolResult, GetPromptResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 // Get devlog path from environment or use default
-import { DOKORO_PATH } from './shared/devlog-utils.js';
+import { DOKORO_PATH } from './shared/dokoro-utils.js';
 
 // Initialize the MCP server
 const server = new McpServer({

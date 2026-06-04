@@ -1,5 +1,5 @@
 /**
- * Bridge Service - Connects tachibot-mcp outputs to devlog-mcp persistence
+ * Bridge Service - Connects tachibot-mcp outputs to dokoro-mcp persistence
  *
  * Pure business logic, no MCP/Zod awareness.
  * Three functions: indexResearch, importPlan, getContext
@@ -8,7 +8,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import { getSqliteDb, ensureVectorTables } from '../db/index.js';
 import { createVectorServices, type SearchResult } from './vector-service.js';
 

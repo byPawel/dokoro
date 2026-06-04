@@ -5,7 +5,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 
 export interface WorkspaceLock {
   agent_id: string;

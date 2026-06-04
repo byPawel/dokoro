@@ -1,7 +1,7 @@
 /**
  * Vector Service for Semantic Search
  *
- * Ported from devlog-ui server/vectorService.ts
+ * Ported from dokoro-ui server/vectorService.ts
  *
  * Handles:
  * - Embeddings via Ollama (nomic-embed-text)

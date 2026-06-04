@@ -6,7 +6,7 @@ import { getDb, createDoc, searchDocs, addTagsToDoc, getDocTags, closeAllDbs } f
 import * as fs from "node:fs";
 
 async function main() {
-  const testDir = "/tmp/devlog-test-" + Date.now();
+  const testDir = "/tmp/dokoro-test-" + Date.now();
   fs.mkdirSync(testDir, { recursive: true });
 
   console.log("Testing database at:", testDir);

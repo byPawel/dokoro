@@ -20,7 +20,7 @@ let tmpDir: string;
 // Set a placeholder so the mock registration itself doesn't blow up.
 tmpDir = os.tmpdir();
 
-jest.mock('../types/devlog.js', () => ({
+jest.mock('../types/dokoro.js', () => ({
   get DOKORO_PATH() {
     return tmpDir;
   },
@@ -45,7 +45,7 @@ async function freshModule(): Promise<LockManager> {
 
 describe('lock-manager (BUG-19 — atomic O_EXCL)', () => {
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devlog-lock-test-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dokoro-lock-test-'));
     await fs.mkdir(path.join(tmpDir, '.mcp'), { recursive: true });
     // Refresh the module so LOCK_FILE picks up the new tmpDir
     lockManager = await freshModule();

@@ -8,7 +8,7 @@ import { extractMetadata, updateMetadata, classifyToolActivity } from './session
 import { updateLockHeartbeat } from './lock-manager.js';
 import { notifyActivity } from './heartbeat-manager.js';
 import { getSqliteDb } from '../db/index.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import * as path from 'node:path';
 
 interface ToolContext {

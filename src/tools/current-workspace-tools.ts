@@ -13,7 +13,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 
 interface CurrentWorkspaceParams {
   includeDays?: number;

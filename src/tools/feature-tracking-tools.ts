@@ -9,7 +9,7 @@ import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getCurrentWorkspace } from '../utils/workspace.js';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 
 // Feature status enum
 // const _FeatureStatus = z.enum(['ideas', 'planned', 'active', 'completed', 'archived']);

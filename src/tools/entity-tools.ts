@@ -10,7 +10,7 @@ import type Database from 'better-sqlite3';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getSqliteDb } from '../db/index.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import { LlmEntityExtractor } from '../services/llm-entity-extractor.js';
 import { EntityPersistence } from '../services/entity-extractor.js';
 import * as path from 'node:path';

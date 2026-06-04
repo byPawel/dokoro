@@ -42,13 +42,13 @@
     "bin"
   ],
   "bin": {
-    "devlog": "./bin/devlog.js"
+    "dokoro": "./bin/dokoro.js"
   },
   "scripts": {
-    "devlog": "tsx src/devlog-cli.ts",
-    "devlog:init": "tsx src/devlog-cli.ts init",
-    "devlog:migrate": "tsx src/devlog-cli.ts migrate",
-    "devlog:cleanup": "tsx scripts/cleanup.ts",
+    "dokoro": "tsx src/dokoro-cli.ts",
+    "dokoro:init": "tsx src/dokoro-cli.ts init",
+    "dokoro:migrate": "tsx src/dokoro-cli.ts migrate",
+    "dokoro:cleanup": "tsx scripts/cleanup.ts",
     "build": "npm run build:esm",
     "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
     "build:esm:w": "npm run build:esm -- -w",
@@ -62,10 +62,10 @@
     "dev:search": "tsx watch src/servers/search-server.ts",
     "dev:planning": "tsx watch src/servers/planning-server.ts",
     "dev:analytics": "tsx watch src/servers/analytics-server.ts",
-    "server:core": "node bin/devlog-core.js",
-    "server:search": "node bin/devlog-search.js",
-    "server:planning": "node bin/devlog-planning.js",
-    "server:analytics": "node bin/devlog-analytics.js",
+    "server:core": "node bin/dokoro-core.js",
+    "server:search": "node bin/dokoro-search.js",
+    "server:planning": "node bin/dokoro-planning.js",
+    "server:analytics": "node bin/dokoro-analytics.js",
     "server:unified": "node dist/esm/servers/unified-server.js",
     "serve": "tsx src/servers/unified-server.ts"
   },

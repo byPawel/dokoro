@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { icon } from '../utils/icons.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import { getSqliteDb, ensureVectorTables } from '../db/index.js';
 import { createVectorServices, type SearchResult } from '../services/vector-service.js';
 import * as path from 'node:path';

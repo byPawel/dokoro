@@ -23,7 +23,7 @@ const analyticsTools: ToolDefinition[] = [
 ];
 
 const config = {
-  name: 'devlog-analytics',
+  name: 'dokoro-analytics',
   version: '1.0.0',
   description: 'Time tracking and productivity analytics for DevLog'
 };

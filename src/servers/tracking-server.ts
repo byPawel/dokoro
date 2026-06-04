@@ -31,7 +31,7 @@ const trackingTools = [
 ].filter(Boolean);
 
 const config = {
-  name: 'devlog-tracking',
+  name: 'dokoro-tracking',
   version: '1.0.0',
   description: 'Issue & Feature tracking tools with time integration and backup'
 };

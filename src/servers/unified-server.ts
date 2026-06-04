@@ -9,7 +9,7 @@
 import { createDevlogServer, startServer } from './base-server.js';
 import { workspaceTools } from '../tools/workspace-tools.js';
 import { currentWorkspaceTools } from '../tools/current-workspace-tools.js';
-import { devlogInitTool } from '../tools/devlog-init-tool.js';
+import { devlogInitTool } from '../tools/dokoro-init-tool.js';
 import { questionTools } from '../tools/question-tools.js';
 import { assetTools } from '../tools/asset-tools.js';
 import { planTools } from '../tools/plan-tools.js';
@@ -48,7 +48,7 @@ async function main() {
   }
 
   const config = {
-    name: 'devlog-unified',
+    name: 'dokoro-unified',
     version: '2.0.0',
     description: 'Unified DevLog MCP Server - all tools in one process',
   };

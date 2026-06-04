@@ -8,7 +8,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ToolDefinition } from './registry.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { DOKORO_PATH } from '../types/devlog.js';
+import { DOKORO_PATH } from '../types/dokoro.js';
 import matter from 'gray-matter';
 import { glob } from 'glob';
 

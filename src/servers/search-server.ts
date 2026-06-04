@@ -9,7 +9,7 @@ import { lancedbTools } from '../tools/lancedb-tools.js';
 import { basicTools } from '../tools/basic-tools.js';
 import { getSqliteDb } from '../db/index.js';
 import { startBackgroundIndexer } from '../services/background-indexer.js';
-import { DOKORO_PATH } from '../shared/devlog-utils.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 import * as path from 'node:path';
 import type { ToolDefinition } from '../tools/registry.js';
 
@@ -28,7 +28,7 @@ async function main() {
   }
 
   const config = {
-    name: 'devlog-search',
+    name: 'dokoro-search',
     version: '2.0.0',
     description: 'LanceDB-powered hybrid semantic search for DevLog entries',
   };

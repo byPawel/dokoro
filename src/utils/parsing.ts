@@ -1,5 +1,5 @@
 import matter from 'gray-matter';
-import { ParsedDevlog } from '../types/devlog.js';
+import { ParsedDevlog } from '../types/dokoro.js';
 
 /**
  * Parse devlog content with frontmatter
