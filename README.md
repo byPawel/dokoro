@@ -305,6 +305,16 @@ ollama pull llama3.2
 ollama serve            # runs as a background service on most platforms
 ```
 
+### Lean install — skip the native vector deps (optional)
+
+`@lancedb/lancedb` and `apache-arrow` (the vector backend, ~100 MB of native deps) are declared as **`optionalDependencies`**. npm installs them by default, but you can skip them for a much lighter footprint:
+
+```bash
+npm install --omit=optional
+```
+
+The server still starts — LanceDB is **lazy-loaded**, so only the vector/semantic-search tools error (with an install hint) if you call them; everything else keeps working, and `dokoro_session_recall` falls back to substring + recency ranking. Add vectors later with `npm install @lancedb/lancedb apache-arrow`.
+
 ---
 
 ## Pairing with tachibot-mcp — memory for multi-model agents
