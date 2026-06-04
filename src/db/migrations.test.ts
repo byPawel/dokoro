@@ -68,6 +68,69 @@ describe('runMigrations', () => {
     expect(typeof open.id).toBe('number');
   });
 
+  it('migration v2 survives a legacy entity_relations that LACKS valid_from/valid_to (BUG-31)', () => {
+    // Replicate the exact production state: schema.sql seeded schema_version=1
+    // ("Initial schema"), which collides with MIGRATIONS v1 and makes it skip —
+    // so entity_relations never got valid_from/valid_to and agent_feedback was
+    // never created. v2's copy-SELECT then threw "no such column: valid_from",
+    // aborting DB init for every devlog tool on that DB.
+    db.prepare(`CREATE TABLE schema_version (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)`).run();
+    db.prepare(`INSERT INTO schema_version (version, description) VALUES (1, 'Initial schema')`).run();
+    db.prepare(`
+      CREATE TABLE entity_relations (
+        source_id INTEGER NOT NULL,
+        target_id INTEGER NOT NULL,
+        relation_type TEXT NOT NULL,
+        weight REAL DEFAULT 1.0,
+        metadata_json TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (source_id, target_id, relation_type)
+      )
+    `).run();
+    db.prepare(`INSERT INTO entity_relations (source_id,target_id,relation_type,weight,metadata_json,created_at)
+      VALUES (1,2,'uses',0.7,'{"a":1}','2026-01-01T00:00:00Z')`).run();
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    // Row survives; valid_from is backfilled from created_at, valid_to stays open.
+    const row = db.prepare(`SELECT source_id,target_id,relation_type,weight,metadata_json,valid_from,valid_to,created_at
+      FROM entity_relations`).get() as Record<string, unknown>;
+    expect(row).toMatchObject({
+      source_id: 1, target_id: 2, relation_type: 'uses', weight: 0.7,
+      metadata_json: '{"a":1}', valid_from: '2026-01-01T00:00:00Z', valid_to: null,
+    });
+
+    // New surrogate-id shape + open-unique index present.
+    const cols = db.prepare(`PRAGMA table_info(entity_relations)`).all() as Array<{ name: string }>;
+    expect(cols.some((c) => c.name === 'id')).toBe(true);
+    expect(cols.some((c) => c.name === 'valid_from')).toBe(true);
+  });
+
+  it('migration v7 creates conversation_summaries on a legacy DB that lacks it (BUG-31)', () => {
+    // Simulate a pre-existing DB: schema_version already present (so the gated
+    // initializeSchema never re-runs schema.sql) but no conversation_summaries.
+    db.prepare(`CREATE TABLE schema_version (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)`).run();
+    db.prepare(`INSERT INTO schema_version (version, description) VALUES (1, 'Initial schema')`).run();
+
+    expect(
+      db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_summaries'`).get()
+    ).toBeUndefined();
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    expect(
+      db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_summaries'`).get()
+    ).toBeDefined();
+
+    // The columns the summary-insert path writes must exist.
+    const cols = new Set(
+      (db.prepare(`PRAGMA table_info(conversation_summaries)`).all() as Array<{ name: string }>).map((c) => c.name)
+    );
+    for (const c of ['session_id', 'ai_model', 'summary', 'key_decisions_json', 'key_topics_json', 'message_count', 'token_count', 'started_at']) {
+      expect(cols.has(c)).toBe(true);
+    }
+  });
+
   it('migration v4 rebuilds entity_content_hashes with FK and cascades on doc delete (BUG-23)', () => {
     // Bootstrap minimal tables the migration needs.
     db.prepare(`

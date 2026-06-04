@@ -607,6 +607,18 @@ export const workspaceTools: ToolDefinition[] = [
         // Embed the summary for semantic recall. Soft-fail (store null) when
         // Ollama is unavailable so recall falls back to substring + recency.
         ensureEpisodicEmbeddingColumn(db());
+        // Satisfy the conversation_summaries.session_id -> sessions.id FK even when
+        // summarizing an ad-hoc session label that was never formally opened (BUG-31).
+        // "Record a summary for session X" implies session X exists, so create a
+        // minimal placeholder; INSERT OR IGNORE preserves any real session row.
+        // Best-effort: a DB without a sessions table simply skips this.
+        if (a.session_id) {
+          try {
+            db().prepare(
+              `INSERT OR IGNORE INTO sessions (id, started_at, status) VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), 'completed')`,
+            ).run(a.session_id);
+          } catch { /* no sessions table / FK off -> insert proceeds without it */ }
+        }
         let embeddingBlob: Buffer | null = null;
         try {
           const { embedding } = await new EmbeddingService().embed(a.summary);

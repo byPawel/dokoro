@@ -67,13 +67,16 @@ export function ensureEntityTables(sqlite: Database.Database): void {
   const hasValidFrom = cols.some((c) => c.name === 'valid_from');
   const hasValidTo = cols.some((c) => c.name === 'valid_to');
   if (!hasValidFrom) {
-    sqlite.prepare(`ALTER TABLE entity_relations ADD COLUMN valid_from TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`).run();
-    // Backfill: after ALTER, pre-existing rows have valid_from = migration timestamp,
-    // which would hide them from as_of queries with historical timestamps. Set
-    // valid_from = created_at (when the relation was actually recorded) so
-    // point-in-time queries for older dates still see facts that have always existed.
-    // Rows inserted AFTER this migration get CURRENT_TIMESTAMP via the column DEFAULT.
-    sqlite.prepare(`UPDATE entity_relations SET valid_from = created_at WHERE created_at IS NOT NULL`).run();
+    // SQLite forbids ADD COLUMN with NOT NULL and a NON-CONSTANT default
+    // (CURRENT_TIMESTAMP / strftime both throw "Cannot add a NOT NULL column with
+    // default value non-constant"). Add with a constant default, then backfill.
+    sqlite.prepare(`ALTER TABLE entity_relations ADD COLUMN valid_from TEXT NOT NULL DEFAULT ''`).run();
+    // Backfill: set valid_from = created_at (when the relation was actually recorded)
+    // so point-in-time queries for older dates still see facts that have always
+    // existed; fall back to now for rows with no created_at. On legacy DBs migration
+    // v2 immediately rebuilds this table with the proper strftime() column default,
+    // so the placeholder '' default never reaches a future insert.
+    sqlite.prepare(`UPDATE entity_relations SET valid_from = COALESCE(created_at, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`).run();
   }
   if (!hasValidTo) {
     sqlite.prepare(`ALTER TABLE entity_relations ADD COLUMN valid_to TEXT`).run();

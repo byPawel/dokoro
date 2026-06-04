@@ -69,6 +69,40 @@ describe('devlog_session_summary_add', () => {
     delete (globalThis as { __TEST_DB__?: Database.Database }).__TEST_DB__;
   });
 
+  it('session_summary_add succeeds for an ad-hoc session label under FK enforcement (BUG-31)', async () => {
+    // Rebuild conversation_summaries WITH the production FK and turn FK enforcement
+    // on, mirroring the live connection (index.ts sets foreign_keys=ON). Before the
+    // fix, an unregistered session_id failed with "FOREIGN KEY constraint failed".
+    db.prepare('DROP TABLE conversation_summaries').run();
+    db.prepare(`
+      CREATE TABLE conversation_summaries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+        ai_model TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        key_decisions_json TEXT,
+        key_topics_json TEXT,
+        linked_docs_json TEXT,
+        message_count INTEGER,
+        token_count INTEGER,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    db.pragma('foreign_keys = ON');
+
+    const add = workspaceTools.find(t => t.name === 'devlog_session_summary_add')!;
+    const res = await add.handler({ session_id: 'council-adhoc-label', ai_model: 'claude', summary: 'ad-hoc council verdict' });
+    expect((res as { isError?: boolean }).isError).toBeFalsy();
+
+    // The summary persisted, and a placeholder session row was created to satisfy the FK.
+    const sumRow = db.prepare(`SELECT session_id, summary FROM conversation_summaries WHERE session_id = ?`).get('council-adhoc-label');
+    expect(sumRow).toMatchObject({ session_id: 'council-adhoc-label', summary: 'ad-hoc council verdict' });
+    const sessRow = db.prepare(`SELECT id, status FROM sessions WHERE id = ?`).get('council-adhoc-label');
+    expect(sessRow).toMatchObject({ id: 'council-adhoc-label' });
+  });
+
   it('session_summary_add inserts a row that session_recall returns', async () => {
     const add = workspaceTools.find(t => t.name === 'devlog_session_summary_add')!;
     expect(add).toBeDefined();

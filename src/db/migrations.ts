@@ -15,15 +15,25 @@ export const MIGRATIONS: Migration[] = [
   { version: 2, description: 'entity_relations surrogate PK + partial-unique open index', up: (db) => {
     const ddl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='entity_relations'`).get() as { sql?: string } | undefined;
     if (!ddl?.sql || ddl.sql.includes('id INTEGER PRIMARY KEY AUTOINCREMENT')) return; // already new shape
+    db.prepare(`ALTER TABLE entity_relations RENAME TO entity_relations_old`).run();
+    // DBs created before the bi-temporal columns were added lack valid_from/valid_to
+    // on the legacy table. Copying them directly threw "no such column: valid_from"
+    // and aborted DB init (BUG-31). Default the missing temporal columns from the
+    // surrounding data: valid_from <- created_at (when recorded), valid_to <- open.
+    const oldCols = new Set(
+      (db.prepare(`PRAGMA table_info(entity_relations_old)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    const createdAtExpr = oldCols.has('created_at') ? 'created_at' : `strftime('%Y-%m-%dT%H:%M:%SZ','now')`;
+    const validFromExpr = oldCols.has('valid_from') ? 'valid_from' : `COALESCE(${createdAtExpr}, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`;
+    const validToExpr = oldCols.has('valid_to') ? 'valid_to' : 'NULL';
     const statements = [
-      `ALTER TABLE entity_relations RENAME TO entity_relations_old`,
       `CREATE TABLE entity_relations (
         id INTEGER PRIMARY KEY AUTOINCREMENT, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL,
         relation_type TEXT NOT NULL, weight REAL DEFAULT 1.0, metadata_json TEXT,
         valid_from TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         valid_to TEXT, created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')))`,
       `INSERT INTO entity_relations (source_id,target_id,relation_type,weight,metadata_json,valid_from,valid_to,created_at)
-        SELECT source_id,target_id,relation_type,weight,metadata_json,valid_from,valid_to,created_at FROM entity_relations_old`,
+        SELECT source_id,target_id,relation_type,weight,metadata_json,${validFromExpr},${validToExpr},${createdAtExpr} FROM entity_relations_old`,
       `DROP TABLE entity_relations_old`,
       `CREATE UNIQUE INDEX IF NOT EXISTS uq_entity_rel_open ON entity_relations(source_id,target_id,relation_type) WHERE valid_to IS NULL`,
       `CREATE INDEX IF NOT EXISTS idx_entity_rel_temporal ON entity_relations(source_id,valid_from,valid_to)`,
@@ -101,12 +111,49 @@ export const MIGRATIONS: Migration[] = [
       `UPDATE entities SET canonical_name = lower(name) WHERE canonical_name IS NULL`,
     ]) db.prepare(s).run();
   } },
+  // Create conversation_summaries (episodic memory) on pre-existing DBs (BUG-31).
+  // The table lives in schema.sql, but initializeSchema only runs schema.sql when
+  // schema_version is ABSENT. DBs created before this table was added to schema.sql
+  // already have schema_version, so they never got it — and no migration created it,
+  // so devlog_session_summary_add/recall failed. CREATE IF NOT EXISTS is a no-op on
+  // fresh DBs (schema.sql already made it). The summary_embedding/compacted columns
+  // are added idempotently at runtime by ensureEpisodicEmbeddingColumn/ensureCompactedColumn.
+  { version: 7, description: 'create conversation_summaries on legacy DBs (episodic memory, BUG-31)', up: (db) => {
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS conversation_summaries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+        ai_model TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        key_decisions_json TEXT,
+        key_topics_json TEXT,
+        linked_docs_json TEXT,
+        message_count INTEGER,
+        token_count INTEGER,
+        started_at DATETIME NOT NULL,
+        ended_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_conv_session ON conversation_summaries(session_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_conv_model ON conversation_summaries(ai_model)`,
+      `CREATE INDEX IF NOT EXISTS idx_conv_dates ON conversation_summaries(started_at, ended_at)`,
+    ];
+    for (const s of statements) db.prepare(s).run();
+  } },
 ];
 
 export function runMigrations(db: Database.Database): void {
   db.prepare(`CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`).run();
+  // Base-table invariant (BUG-31): the legacy schema.sql seeds schema_version=1,
+  // which collides with MIGRATIONS v1 and makes the version loop skip it — so on
+  // those DBs the entity/feedback tables (and valid_from columns) v1 creates were
+  // never applied, yet v2/v3 assume they exist. Run the idempotent ensurers
+  // unconditionally so the base tables exist regardless of the recorded version.
+  // No-ops on healthy DBs (CREATE IF NOT EXISTS + guarded ALTERs).
+  ensureEntityTables(db);
+  ensureAgentFeedbackTable(db);
   const row = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number | null };
   const current = row.v ?? 0;
   // INSERT OR IGNORE: the legacy initializeSchema() init path may also write the
