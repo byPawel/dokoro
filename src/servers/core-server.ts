@@ -14,6 +14,7 @@ import { planTools } from '../tools/plan-tools.js';
 import { entityTools } from '../tools/entity-tools.js';
 import { feedbackTools } from '../tools/feedback-tools.js';
 import { sharedNotesTools } from '../tools/shared-notes-tools.js';
+import { sharedBlocksTools } from '../tools/shared-blocks-tools.js';
 
 // Select only the core tools
 // Exported for use in tests.
@@ -46,6 +47,9 @@ export const coreTools = [
 
   // Shared working memory (concurrent multi-agent notes, per-project)
   ...sharedNotesTools,
+
+  // Shared editable working-memory blocks (optimistic concurrency, per-project)
+  ...sharedBlocksTools,
 
   // Initialization
   dokoroInitTool
