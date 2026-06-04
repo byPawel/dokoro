@@ -15,6 +15,7 @@ import { entityTools } from '../tools/entity-tools.js';
 import { feedbackTools } from '../tools/feedback-tools.js';
 import { sharedNotesTools } from '../tools/shared-notes-tools.js';
 import { sharedBlocksTools } from '../tools/shared-blocks-tools.js';
+import { handoffTools } from '../tools/handoff-tools.js';
 
 // Select only the core tools
 // Exported for use in tests.
@@ -50,6 +51,9 @@ export const coreTools = [
 
   // Shared editable working-memory blocks (optimistic concurrency, per-project)
   ...sharedBlocksTools,
+
+  // Cross-session handoff (write/inbox/claim with atomic claim, per-project)
+  ...handoffTools,
 
   // Initialization
   dokoroInitTool

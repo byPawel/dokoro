@@ -329,6 +329,17 @@ describe('runMigrations', () => {
     expect(pk?.pk).toBe(1);
   });
 
+  it('migration v10 creates handoffs with claim columns', () => {
+    db.prepare(`CREATE TABLE schema_version (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)`).run();
+    expect(() => runMigrations(db)).not.toThrow();
+    const cols = new Set(
+      (db.prepare(`PRAGMA table_info(handoffs)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    for (const c of ['id', 'from_agent', 'to_agent', 'session_id', 'summary', 'open_items_json', 'status', 'claimed_by', 'created_at', 'claimed_at']) {
+      expect(cols.has(c)).toBe(true);
+    }
+  });
+
   it('rolls back a failing migration: no version row is recorded', () => {
     runMigrations(db); // apply existing migrations first
     const failingVersion = MIGRATIONS[MIGRATIONS.length - 1].version + 1;

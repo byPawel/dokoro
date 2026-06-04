@@ -96,4 +96,13 @@ describe('core-server tool registration', () => {
     expect(names).toContain('dokoro_block_read');
     expect(names).toContain('dokoro_block_list');
   });
+
+  it('coreTools includes the cross-session handoff tools', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { coreTools } = require('./core-server.js') as typeof import('./core-server.js');
+    const names = coreTools.map((t: { name: string }) => t.name);
+    expect(names).toContain('dokoro_handoff_write');
+    expect(names).toContain('dokoro_handoff_inbox');
+    expect(names).toContain('dokoro_handoff_claim');
+  });
 });

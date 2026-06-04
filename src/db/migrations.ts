@@ -183,6 +183,27 @@ export const MIGRATIONS: Migration[] = [
     ];
     for (const s of statements) db.prepare(s).run();
   } },
+  // v10: cross-session handoffs. An agent records a handoff for the next agent/session;
+  // a claim step (status open->claimed) stops two agents from both picking it up.
+  // Per-project only.
+  { version: 10, description: 'handoffs table for cross-session multi-agent handoff', up: (db) => {
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS handoffs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_agent TEXT NOT NULL,
+        to_agent TEXT,
+        session_id TEXT,
+        summary TEXT NOT NULL,
+        open_items_json TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        claimed_by TEXT,
+        created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        claimed_at TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_handoffs_status ON handoffs(status, created_at)`,
+    ];
+    for (const s of statements) db.prepare(s).run();
+  } },
 ];
 
 export function runMigrations(db: Database.Database): void {
