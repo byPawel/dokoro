@@ -14,6 +14,7 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { jest } from '@jest/globals';
 import { isoWeekDir, monthDir } from './timestamp.js';
+import { normalizeClaimPath } from './claim-path.js';
 
 jest.mock('../db/index.js', () => ({
   getSqliteDb: () => { throw new Error('getSqliteDb should not be called in tests (use __TEST_DB__)'); },
@@ -222,7 +223,11 @@ describe('sweepWorkspace — daily files', () => {
 
   it('skips a file with a live claim, then moves it once the claim is released', async () => {
     const name = await writeDaily(daysAgo(20));
-    const claimKey = `daily/${name}`.toLowerCase();
+    // Derive the claim key exactly as production does — the test must not
+    // silently diverge from the sweep's key derivation.
+    const normalized = normalizeClaimPath(path.join(dailyDir(), name), tmpDir);
+    if (!normalized.ok) throw new Error(`claim path normalization failed: ${normalized.error}`);
+    const claimKey = normalized.claimKey;
     insertLiveClaim(claimKey);
 
     const blocked = await mod.sweepWorkspace({ claimRoot: tmpDir });

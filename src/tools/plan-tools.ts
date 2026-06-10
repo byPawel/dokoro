@@ -8,6 +8,7 @@ import { DOKORO_PATH } from '../types/dokoro.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 import { formatTimestampSlug } from '../utils/timestamp.js';
+import { PlansIndex } from '../utils/archive.js';
 
 // Plan item interface
 interface PlanItem {
@@ -38,8 +39,9 @@ interface Plan {
 const PLANS_DIR = path.join(DOKORO_PATH, '.mcp', 'plans');
 const PLANS_INDEX = path.join(PLANS_DIR, 'index.json');
 
-// Load plans index
-async function loadPlansIndex(): Promise<Record<string, string>> {
+// Load plans index. Live entries are bare title strings; archived entries
+// are `{ title, archived, archive_path }` objects (see src/utils/archive.ts).
+async function loadPlansIndex(): Promise<PlansIndex> {
   try {
     const content = await fs.readFile(PLANS_INDEX, 'utf-8');
     return JSON.parse(content);
@@ -49,7 +51,7 @@ async function loadPlansIndex(): Promise<Record<string, string>> {
 }
 
 // Save plans index
-async function savePlansIndex(index: Record<string, string>): Promise<void> {
+async function savePlansIndex(index: PlansIndex): Promise<void> {
   await fs.mkdir(PLANS_DIR, { recursive: true });
   await fs.writeFile(PLANS_INDEX, JSON.stringify(index, null, 2));
 }
