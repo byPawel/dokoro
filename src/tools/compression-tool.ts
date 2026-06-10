@@ -63,11 +63,12 @@ export const compressionTool: ToolDefinition = {
       // Generate weekly summary
       const weeklySummary = await generateWeeklySummary(sessions, weekNumber, currentYear);
       
-      // Paths for new files
-      const weeklyFile = path.join(DOKORO_PATH, 'retrospective', 'weekly', 
-        `${currentYear}-W${String(weekNumber).padStart(2, '0')}-consolidated.md`);
-      const archiveDir = path.join(DOKORO_PATH, 'archive', 'daily', 
-        `${currentYear}-W${String(weekNumber).padStart(2, '0')}`);
+      // Paths for new files (deterministic week-scoped names: re-running
+      // compression for the same week must target the same file).
+      const weekDir = weekDirName(currentYear, weekNumber);
+      const weeklyFile = path.join(DOKORO_PATH, 'retrospective', 'weekly',
+        `${weekDir}-consolidated.md`);
+      const archiveDir = path.join(DOKORO_PATH, 'archive', 'daily', weekDir);
       
       if (dryRun) {
         return {
@@ -126,6 +127,18 @@ export const compressionTool: ToolDefinition = {
 
 // Helper functions
 
+/**
+ * Build the `YYYY-Www` directory/filename prefix for a (year, week) pair.
+ *
+ * NOTE: unlike `isoWeekDir()` in src/utils/timestamp.ts (which uses the ISO
+ * week-YEAR), `year` here is the calendar year supplied by the caller (or the
+ * current calendar year). The week NUMBER itself is ISO (see getWeekNumber).
+ * Kept as-is so existing archive names stay stable; do not change silently.
+ */
+function weekDirName(year: number, week: number): string {
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
 function getWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -153,7 +166,13 @@ function getWeekDates(year: number, weekNumber: number) {
   return { start: weekStart, end: weekEnd };
 }
 
-async function findDailyFiles(startDate: Date, endDate: Date): Promise<string[]> {
+/**
+ * Find daily files whose `YYYY-MM-DD` filename prefix falls inside the window.
+ * Matches by date prefix only, so it accepts BOTH old-format files (written
+ * with a possibly local-TZ weekday) and new `formatTimestampSlug` files.
+ * Exported for tests.
+ */
+export async function findDailyFiles(startDate: Date, endDate: Date): Promise<string[]> {
   const pattern = path.join(DOKORO_PATH, 'daily', '*.md');
   const files = await glob(pattern);
   
@@ -289,7 +308,7 @@ ${sessions.map(s => {
   return `### ${dayName}, ${dateStr}
 ${s.summary || 'No summary available'}
 - Completed: ${s.completedTasks.length} tasks
-- File: archive/daily/${year}-W${String(weekNumber).padStart(2, '0')}/${path.basename(s.file)}`;
+- File: archive/daily/${weekDirName(year, weekNumber)}/${path.basename(s.file)}`;
 }).join('\n\n')}
 
 ## 🔍 Patterns & Metrics
@@ -299,7 +318,7 @@ ${s.summary || 'No summary available'}
 
 ---
 *Generated from ${sessions.length} daily sessions*
-*Original files archived to: archive/daily/${year}-W${String(weekNumber).padStart(2, '0')}/*
+*Original files archived to: archive/daily/${weekDirName(year, weekNumber)}/*
 `;
   
   return summary;

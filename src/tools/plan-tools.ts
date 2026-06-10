@@ -7,6 +7,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DOKORO_PATH } from '../types/dokoro.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
+import { formatTimestampSlug } from '../utils/timestamp.js';
 
 // Plan item interface
 interface PlanItem {
@@ -488,7 +489,8 @@ export const planTools: ToolDefinition[] = [
         };
       }
 
-      const now = new Date().toISOString();
+      const nowDate = new Date();
+      const now = nowDate.toISOString();
       plan.validated_at = now;
       plan.validation_notes = notes;
       plan.updated_at = now;
@@ -508,7 +510,9 @@ export const planTools: ToolDefinition[] = [
       const validationTable = generateValidationTable(plan);
 
       // Save validation report to file
-      const reportFilename = `${plan.id}-validation-${now.split('T')[0]}.md`;
+      // Standard UTC timestamp slug prefix + distinguishing `-validation-<planId>` suffix.
+      // (Previously `<planId>-validation-YYYY-MM-DD.md`; nothing reads these by pattern.)
+      const reportFilename = `${formatTimestampSlug(nowDate)}-validation-${plan.id}.md`;
       const reportPath = path.join(DOKORO_PATH, 'daily', reportFilename);
       await fs.mkdir(path.dirname(reportPath), { recursive: true });
 

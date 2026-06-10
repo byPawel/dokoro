@@ -35,6 +35,7 @@ import { ensureEpisodicEmbeddingColumn } from '../db/episodic-tables.js';
 import { startHeartbeat, stopHeartbeat } from '../utils/heartbeat-manager.js';
 import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
+import { formatTimestampSlug, dateStamp } from '../utils/timestamp.js';
 
 export const workspaceTools: ToolDefinition[] = [
   {
@@ -405,10 +406,12 @@ export const workspaceTools: ToolDefinition[] = [
       }
       
       const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = now.toISOString().slice(11, 16).replace(':', 'h');
-      const dayName = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-      
+      // All-UTC slug: `YYYY-MM-DD-HHhMM-dayname` (weekday always agrees with the UTC date).
+      const timestampSlug = formatTimestampSlug(now);
+      const dateStr = dateStamp(now);
+      // Slug layout after the date: `HHhMM-dayname` (weekday names contain no hyphens).
+      const [timeStr, dayName] = timestampSlug.slice(dateStr.length + 1).split('-');
+
       // Extract focus from task
       const taskMatch = workspace.content.match(/task:\s*"([^"]+)"/);
       const task = taskMatch ? taskMatch[1] : 'session';
@@ -418,7 +421,7 @@ export const workspaceTools: ToolDefinition[] = [
         .substring(0, 30);
       
       // Create filename
-      const filename = `${dateStr}-${timeStr}-${dayName}-session-${safeTopic}.md`;
+      const filename = `${timestampSlug}-session-${safeTopic}.md`;
       const dailyDir = path.join(DOKORO_PATH, 'daily');
       const sessionFile = path.join(dailyDir, filename);
       
