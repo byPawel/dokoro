@@ -87,8 +87,14 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     );
   }, [items, filter]);
 
-  const safeItemIndex = Math.min(itemIndex, Math.max(0, filteredItems.length - 1));
+  const safeItemIndex = Math.max(0, Math.min(itemIndex, filteredItems.length - 1));
   const maxScroll = Math.max(0, contentLines.length - viewport);
+
+  // Each filter-text change invalidates the filtered list (and any previous
+  // index) — pin the selection back to the top.
+  useEffect(() => {
+    setItemIndex(0);
+  }, [filter]);
 
   const openCategory = (cat: BrowseCategory): void => {
     void listItems(dokoroPath, cat.id).then((list) => {
@@ -117,8 +123,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       if (key.return) { setTypingFilter(false); return; }
       if (key.backspace || key.delete) { setFilter((f) => f.slice(0, -1)); return; }
       if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
-      if (key.downArrow) { setItemIndex(Math.min(filteredItems.length - 1, safeItemIndex + 1)); return; }
-      if (input !== '' && !key.ctrl && !key.meta) { setFilter((f) => f + input); setItemIndex(0); }
+      if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
+      if (input !== '' && !key.ctrl && !key.meta) setFilter((f) => f + input);
       return;
     }
 
@@ -141,8 +147,12 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       }
       if (input === '/') { setTypingFilter(true); return; }
       if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
-      if (key.downArrow) { setItemIndex(Math.min(filteredItems.length - 1, safeItemIndex + 1)); return; }
-      if (key.return && filteredItems.length > 0) openItem(filteredItems[safeItemIndex]);
+      if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
+      if (key.return) {
+        // No-op on an empty (filtered) list — never index into nothing.
+        if (filteredItems.length === 0) return;
+        openItem(filteredItems[safeItemIndex]);
+      }
       return;
     }
 

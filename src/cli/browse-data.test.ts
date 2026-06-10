@@ -195,24 +195,28 @@ describe('listItems: plans', () => {
     ]);
     await writeJson(path.join(plansDir(), 'index.json'), {
       'plan-live': 'Title of plan-live',
-      'plan-done': { title: 'Title of plan-done', archived: true, archive_path: 'archive/2026-05/plan-done.json' },
+      'plan-done': { title: '2026-05 done plan', archived: true, archive_path: 'archive/2026-05/plan-done.json' },
+      'plan-newer': { title: '2026-06 done plan', archived: true, archive_path: 'archive/2026-06/plan-newer.json' },
     });
 
     const items = await mod.listItems(tmpDir, 'plans');
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
 
-    const [live, archived] = items;
+    const [live, archivedNewer, archivedOlder] = items;
     expect(live.id).toBe('plan-live');
     expect(live.label).toBe('Title of plan-live');
     expect(live.sublabel).toContain('[active]');
     expect(live.sublabel).toContain('1/2');
     expect(live.archived).toBeUndefined();
 
-    expect(archived.id).toBe('plan-done');
-    expect(archived.label).toBe('Title of plan-done');
-    expect(archived.sublabel).toBe('[archived]');
-    expect(archived.archived).toBe(true);
-    expect(archived.path).toBe(path.join(plansDir(), 'archive/2026-05/plan-done.json'));
+    // Archived plans sort newest-first by label (same direction as 'archive').
+    expect(archivedNewer.id).toBe('plan-newer');
+    expect(archivedNewer.label).toBe('2026-06 done plan');
+    expect(archivedOlder.id).toBe('plan-done');
+    expect(archivedOlder.label).toBe('2026-05 done plan');
+    expect(archivedOlder.sublabel).toBe('[archived]');
+    expect(archivedOlder.archived).toBe(true);
+    expect(archivedOlder.path).toBe(path.join(plansDir(), 'archive/2026-05/plan-done.json'));
   });
 });
 
@@ -315,5 +319,13 @@ describe('readItemContent', () => {
       path: path.join(tmpDir, 'nope', 'ghost.md'),
     });
     expect(ghost).toContain('(unable to read');
+  });
+
+  it('degrades to a string (no rejection) for an undefined item', async () => {
+    // The UI guards enter on an empty filtered list; this is the defensive
+    // backstop should that guard ever be bypassed.
+    const content = await mod.readItemContent(undefined as unknown as Parameters<typeof mod.readItemContent>[0]);
+    expect(typeof content).toBe('string');
+    expect(content).toBe('(nothing selected)');
   });
 });

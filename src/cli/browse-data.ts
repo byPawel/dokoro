@@ -217,12 +217,11 @@ function dbUnavailableItem(kind: 'claim' | 'agent'): BrowseItem {
 
 /** All browse categories with their item counts. Missing dirs count 0. */
 export async function listCategories(dokoroPath: string): Promise<BrowseCategory[]> {
-  const categories: BrowseCategory[] = [];
-  for (const id of Object.keys(CATEGORY_LABELS) as BrowseCategoryId[]) {
+  const ids = Object.keys(CATEGORY_LABELS) as BrowseCategoryId[];
+  return Promise.all(ids.map(async (id): Promise<BrowseCategory> => {
     const items = await listItems(dokoroPath, id);
-    categories.push({ id, label: CATEGORY_LABELS[id], count: items.length });
-  }
-  return categories;
+    return { id, label: CATEGORY_LABELS[id], count: items.length };
+  }));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -361,7 +360,8 @@ async function planItems(dokoroPath: string): Promise<BrowseItem[]> {
   }
 
   live.sort((a, b) => b.updatedMs - a.updatedMs);
-  archived.sort((a, b) => a.label.localeCompare(b.label));
+  // Newest first by label, matching the archive category's sort direction.
+  archived.sort((a, b) => b.label.localeCompare(a.label));
   return [...live.map((l) => l.item), ...archived];
 }
 
@@ -467,6 +467,9 @@ async function sweepItems(dokoroPath: string): Promise<BrowseItem[]> {
  * Never throws — unreadable content comes back as a `(unable to read …)` line.
  */
 export async function readItemContent(item: BrowseItem): Promise<string> {
+  // Defensive: the UI guards against opening on an empty list, but a missing
+  // item must still degrade to a string, never a rejection.
+  if (item === undefined || item === null) return '(nothing selected)';
   try {
     if (item.detail !== undefined) return item.detail;
     if (item.path === undefined) {

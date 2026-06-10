@@ -542,7 +542,7 @@ async function main(): Promise<void> {
         const dokoroPath =
           typeof flags.path === "string"
             ? path.resolve(flags.path)
-            : path.join(config.projectPath, config.dokoroFolder!);
+            : path.join(config.projectPath, config.dokoroFolder ?? "dokoro");
         await runBrowse(dokoroPath);
         break;
       }
