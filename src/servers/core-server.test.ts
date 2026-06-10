@@ -113,4 +113,13 @@ describe('core-server tool registration', () => {
     expect(names).toContain('dokoro_presence_ping');
     expect(names).toContain('dokoro_presence_list');
   });
+
+  it('coreTools includes the advisory file-claim tools', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { coreTools } = require('./core-server.js') as typeof import('./core-server.js');
+    const names = coreTools.map((t: { name: string }) => t.name);
+    expect(names).toContain('dokoro_file_claim');
+    expect(names).toContain('dokoro_file_release');
+    expect(names).toContain('dokoro_claim_list');
+  });
 });

@@ -17,6 +17,7 @@ import { sharedNotesTools } from '../tools/shared-notes-tools.js';
 import { sharedBlocksTools } from '../tools/shared-blocks-tools.js';
 import { handoffTools } from '../tools/handoff-tools.js';
 import { presenceTools } from '../tools/presence-tools.js';
+import { fileClaimTools } from '../tools/file-claim-tools.js';
 import { contextInspectTools } from '../tools/context-inspect-tools.js';
 
 // Select only the core tools
@@ -59,6 +60,9 @@ export const coreTools = [
 
   // Agent presence (daemonless heartbeat, read-time liveness, per-project)
   ...presenceTools,
+
+  // Advisory per-file claims (lease + takeover, per-project)
+  ...fileClaimTools,
 
   // Context-inspector events (file-based JSONL, per-day)
   ...contextInspectTools,
