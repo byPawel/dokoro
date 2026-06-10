@@ -104,6 +104,98 @@ await dokoro_current_update({
 });
 ```
 
+### dokoro_file_claim
+
+Place an ADVISORY claim on one or more files so cooperating agents can see who is editing what. Claims warn — they never block edits. Acquisition is all-or-nothing: if any path is held by a live agent (and `force` is not set), nothing is claimed and a per-path conflict report is returned. Re-claiming your own file renews the lease (extends expiry, bumps `heartbeat_seq`). Claims whose lease expired, or whose holder's `agent_presence` heartbeat is stale (older than 900 seconds), are taken over automatically. All timestamps are server-assigned SQLite unixepoch seconds.
+
+**Parameters:**
+- `paths` (string[], required): Files to claim, 1–50 entries (relative to `root`, or absolute under it)
+- `agent_id` (string, required): Your stable agent identity
+- `session_id` (string, optional): Session identifier
+- `intent` (string, optional): What you plan to do with these files (shown to other agents)
+- `ttl_seconds` (number, optional): Lease duration in seconds (default: 300, max: 3600); renew by re-claiming
+- `root` (string, optional): Workspace root the paths are relative to (default: server process cwd); claims store only normalized root-relative paths, so all agents must use the same root
+- `force` (boolean, optional): Override even live holders, recorded as a forced takeover (default: false)
+
+**Returns:**
+- On success: per-path report with status `claimed`, `renewed`, `taken_over`, or `taken_over_forced`, plus the lease expiry
+- On conflict (not an error): per-path report — `conflict` entries carry the holder's `agent_id`, `intent`, `expires_in_seconds`, and presence (`live`/`stale`/`unknown`); nothing is claimed
+
+**Example:**
+```typescript
+const result = await dokoro_file_claim({
+  paths: ["src/auth/session.ts", "src/auth/tokens.ts"],
+  agent_id: "claude-code",
+  intent: "refactoring token refresh",
+  ttl_seconds: 600
+});
+// Conflict? Wait for the lease, claim other files, or retry with force: true
+```
+
+### dokoro_file_release
+
+Release advisory file claims held by you: specific paths, or everything you hold. Owner-aware (you can only release your own claims) and idempotent — unknown or already-released paths report `not_found`, never an error.
+
+**Parameters:**
+- `agent_id` (string, required): Your stable agent identity (only your claims are released)
+- `paths` (string[], optional): Specific files to release, 1–50 entries (omit when using `all`)
+- `all` (boolean, optional): Release every open claim held by `agent_id` (mutually exclusive with `paths`)
+- `root` (string, optional): Workspace root the paths are relative to (default: server process cwd)
+
+**Returns:**
+- Per-path report with status `released`, `not_held_by_you`, or `not_found`
+
+**Example:**
+```typescript
+await dokoro_file_release({ agent_id: "claude-code", all: true });
+// or release selectively:
+await dokoro_file_release({
+  agent_id: "claude-code",
+  paths: ["src/auth/session.ts"]
+});
+```
+
+### dokoro_claim_list
+
+List open advisory file claims, soonest expiry first, with holder liveness corroborated from `agent_presence`: `live` = heartbeat within 900 seconds, `stale` = older heartbeat, `unknown` = the agent never pinged. Expired claims are hidden unless requested.
+
+**Parameters:**
+- `agent_id` (string, optional): Only show claims held by this agent
+- `include_expired` (boolean, optional): Also show open claims whose lease already expired (default: false)
+- `root` (string, optional): Informational — listed paths are root-relative
+
+**Returns:**
+- Markdown table plus JSON: per claim `path`, `agent_id`, `intent`, `expires_in_seconds`, `heartbeat_seq`, `presence`
+
+**Example:**
+```typescript
+const claims = await dokoro_claim_list({ include_expired: true });
+// | path | agent | intent | expires_in_s | presence |
+```
+
+### dokoro_archive_sweep
+
+Archive stale workspace files on demand. `daily/*.md` older than `olderThanDays` move to `archive/daily/<ISO week>/` — the current ISO week and files with a live advisory claim are never touched — and completed/validated plans older than `planOlderThanDays` move to `.mcp/plans/archive/<YYYY-MM>/` (still listed by `dokoro_plan_list`, read-only). The sweep is a singleton guarded by `.mcp/archive.lock` (5-minute TTL); a concurrent run reports `skipped: locked`, which is benign.
+
+**Parameters:**
+- `olderThanDays` (number, optional): Daily files older than this many days are eligible (default: 7)
+- `planOlderThanDays` (number, optional): Completed/validated plans older than this many days are archived (default: 30)
+- `dryRun` (boolean, optional): Preview only — report what WOULD move without touching anything (default: **false** — by default files ARE moved)
+- `status_only` (boolean, optional): Skip sweeping; pretty-print `.mcp/archive-status.json` from the last sweep (default: false)
+
+**Returns:**
+- Counts and lists of daily files moved and plans archived, plus per-file errors (which do not fail the sweep)
+- With `status_only`: last run time, moved/archived counts, and last error from `.mcp/archive-status.json`
+
+**Example:**
+```typescript
+// Preview first, then sweep
+await dokoro_archive_sweep({ dryRun: true });
+await dokoro_archive_sweep({ olderThanDays: 14 });
+// Inspect the last run
+await dokoro_archive_sweep({ status_only: true });
+```
+
 ## Analytics Server Tools
 
 ### dokoro_analytics_summary

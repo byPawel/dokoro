@@ -36,8 +36,9 @@ npm run dev:core     # Run the core server in watch mode (also: dev:search, dev:
 
 ## Tools by memory layer
 
-- **Working**: `dokoro_workspace_*`, `dokoro_session_log`, `dokoro_question_*`
+- **Working**: `dokoro_workspace_*`, `dokoro_session_log`, `dokoro_question_*`, `dokoro_file_claim`, `dokoro_file_release`, `dokoro_claim_list`
 - **Episodic**: `dokoro_session_recall`, `dokoro_compress_week`
 - **Semantic**: `dokoro_entity_graph` (bi-temporal `as_of`), `dokoro_entity_extract_deep`
 - **Procedural**: `dokoro_plan_*`
 - **Affective**: `dokoro_feedback_record`, `dokoro_feedback_query`
+- **Lifecycle**: `dokoro_archive_sweep` (manual sweep; `dokoro_plan_validate` auto-archives validated plans, `dokoro_workspace_claim` sweeps opportunistically)

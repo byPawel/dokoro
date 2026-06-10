@@ -166,6 +166,64 @@ graph LR
     DB --- DOCS
 ```
 
+## Per-File Claim Ledger (migration v12)
+
+Multiple agents sharing one worktree coordinate through the `file_claims` table — an **advisory** claim ledger added in migration v12. Conflicts WARN, they never block: enforcement lives in the tools layer (`dokoro_file_claim` / `dokoro_file_release` / `dokoro_claim_list`), not in the schema.
+
+```sql
+CREATE TABLE file_claims (
+  claim_key TEXT PRIMARY KEY,   -- casefolded normalized root-relative path (one file = one row)
+  file_path TEXT NOT NULL,      -- display form
+  agent_id TEXT NOT NULL,
+  session_id TEXT,
+  intent TEXT,
+  claimed_at INTEGER NOT NULL,  -- server-assigned unixepoch seconds
+  expires_at INTEGER NOT NULL,
+  heartbeat_seq INTEGER NOT NULL DEFAULT 0,  -- monotonic renewal counter
+  released_at INTEGER           -- NULL = claim is open
+);
+-- partial index over live claims only
+CREATE INDEX idx_file_claims_live ON file_claims(expires_at) WHERE released_at IS NULL;
+```
+
+**Advisory semantics.** A claim is information, not a lock: `dokoro_file_claim` returns a structured conflict report (holder, intent, expiry, presence) instead of an error, and `force:true` always wins (recorded as a forced takeover). Acquisition is all-or-nothing inside one immediate SQLite transaction, so the liveness re-check and the conditional takeover cannot interleave with another writer.
+
+**Lease + takeover model (DynamoDB lock-client style).** A claim expires at `expires_at` (`ttl_seconds` default 300, max 3600) unless renewed — re-claiming your own path bumps `heartbeat_seq` and extends the lease. Holder liveness is corroborated at read time against `agent_presence`: an unexpired claim whose holder's heartbeat is stale (> 900 s) may be taken over; a holder with **no** presence row is treated as live while the claim is unexpired (presence is evidence only when present). All timestamps come from one clock domain — SQLite `strftime('%s','now')`, never `Date.now()` — so cross-machine clock skew can't corrupt expiry decisions. Rows are ephemeral coordination state: released or long-expired rows are pruned opportunistically after a day.
+
+## Archive Lifecycle
+
+Finished work moves out of the live workspace automatically; nothing is deleted, and archived material stays readable.
+
+| What | When | Where it goes |
+|------|------|---------------|
+| Validated plans | Immediately, on `dokoro_plan_validate` (status `validated`) | `.mcp/plans/archive/YYYY-MM/<planId>.json` |
+| Completed/validated plans | Sweep: older than 30 days (plan `updated_at` → `created_at` → file mtime) | same month-partitioned archive |
+| `daily/*.md` session files | Sweep: filename date older than 7 days **and** outside the current ISO week **and** no live file claim | `archive/daily/YYYY-Www/` (ISO week of the file's date) |
+
+The sweep runs opportunistically on `dokoro_workspace_claim` (never failing the claim) and on demand via `dokoro_archive_sweep` (`dryRun` previews; `status_only` reads the last run). Archived plans remain discoverable: `dokoro_plan_list` shows them marked **(archived)**, read tools resolve them from the archive, and write tools refuse with a read-only error.
+
+**Crash safety:**
+
+- **Atomic index writes** — `.mcp/plans/index.json` is written via temp file + atomic rename. Archiving moves the plan file FIRST and updates the index second; a crash in between is healed on the next run (the plan is found by scanning the archive partitions and the index is repaired).
+- **Singleton sweep lock** — `.mcp/archive.lock` is created with `O_EXCL`; a concurrent sweep reports `skipped: locked` (benign). A lock older than the 5-minute TTL is treated as a crashed sweep, broken, and the exclusive create retried once.
+- **`archive-status.json`** — every non-dry sweep atomically writes `.mcp/archive-status.json` (last run, counts, per-file errors, last error) for observability; per-file failures are recorded and the sweep continues past them.
+
+## Unified Timestamp Slugs
+
+All generated filenames share one UTC slug from `src/utils/timestamp.ts`:
+
+```
+formatTimestampSlug → YYYY-MM-DD-HHhMM-dayname     e.g. 2026-06-10-22h23-wednesday
+isoWeekDir          → YYYY-Www (ISO week-YEAR)     e.g. 2026-W24
+monthDir            → YYYY-MM                       e.g. 2026-06
+```
+
+- Session dumps: `<slug>-session-<topic>.md`
+- Plan validation reports: `<slug>-validation-<planId>.md`
+- Archive partitions: `archive/daily/<isoWeekDir>/` and `.mcp/plans/archive/<monthDir>/`
+
+Every component — date, time, weekday, week number — is derived from UTC, fixing the classic bug of mixing a `toISOString()` (UTC) date with a `toLocaleDateString()` (local-timezone) weekday name, which disagree around UTC midnight. `isoWeekDir` uses the ISO week-YEAR (Dec 29–31 can fall in next year's W01); note `dokoro_compress_week` keeps its legacy calendar-year week directories for existing-archive stability, so the two can differ around year boundaries.
+
 ## Architecture Assessment
 
 **Rating: 7.5/10**

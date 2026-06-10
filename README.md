@@ -6,6 +6,7 @@
 
 A multi-layer **agent memory** MCP server: a persistent brain for your LLM agent.
 Remember what you're doing, what you did, what you know, and **how well each tool actually performs** — across sessions, models, and projects.
+Claim files, leave handoffs, and resume work without guessing — works for one agent today; prevents collisions when you add another.
 
 [![Website](https://img.shields.io/badge/website-bypawel.github.io%2Fdokoro-6e5494.svg)](https://bypawel.github.io/dokoro/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -189,6 +190,9 @@ Tools are organised by which memory layer they read or write.
 | `dokoro_handoff_claim` | Atomically claim a handoff so only one agent takes it |
 | `dokoro_presence_ping` | Heartbeat — announce this agent is active (status, focus) |
 | `dokoro_presence_list` | List agents currently active in the project (read-time TTL) |
+| `dokoro_file_claim` | Advisory per-file claim with a lease (default 300 s, max 3600 s) — warns other agents, never blocks |
+| `dokoro_file_release` | Release your file claims (specific paths or `all:true`) — owner-aware, idempotent |
+| `dokoro_claim_list` | List open file claims with holder liveness (`live` / `stale` / `unknown` via `agent_presence`) |
 | `dokoro_question_add` | Log a question during development |
 | `dokoro_question_answer` | Answer a previously logged question |
 | `dokoro_question_list` | List all tracked questions |
@@ -248,6 +252,7 @@ Tools are organised by which memory layer they read or write.
 | Tool | Description |
 |------|-------------|
 | `dokoro_init` | Initialize dokoro workspace and database |
+| `dokoro_archive_sweep` | Sweep stale daily files and finished plans into the archive (`dryRun` to preview, `status_only` to inspect the last run) |
 | `dokoro_save_image` | Save an image asset (base64 or URL) |
 | `dokoro_save_file` | Save a file asset |
 | `dokoro_list_assets` | List saved assets |
@@ -255,6 +260,55 @@ Tools are organised by which memory layer they read or write.
 </details>
 
 > Tools above are exposed by the **core server** (`bin/dokoro-core.js`). The optional **analytics server** (`bin/dokoro-analytics.js`) adds `dokoro_compress_week`. Other modular servers (search, planning, tracking) expose additional tools not yet wired into core — see `src/servers/*.ts`.
+
+---
+
+## Multi-agent file claims
+
+When several agents share one worktree, `dokoro_file_claim` gives them an **advisory** per-file ledger: claim the files you're about to edit, and everyone else sees who is editing what. Claims **warn — they never block**:
+
+- **Lease semantics** — a claim expires after `ttl_seconds` (default **300 s**, max **3600 s**); renew by re-claiming the same path (bumps a monotonic `heartbeat_seq` and extends the lease).
+- **All-or-nothing** — claiming multiple paths either acquires every one or none; a conflict returns a per-path report with the live holder's `agent_id`, `intent`, expiry, and presence.
+- **Stale takeover** — an expired claim, or one whose holder's `agent_presence` heartbeat is stale (> 900 s), is taken over automatically; `force:true` overrides even a live holder (recorded as a forced takeover).
+- **One clock** — all timestamps are server-assigned SQLite `unixepoch` seconds, so agents on different machines can't disagree about expiry.
+
+`dokoro_claim_list` shows open claims with holder liveness (`live` / `stale` / `unknown`); `dokoro_file_release` releases your own claims (and only yours). Backed by the `file_claims` table (migration v12).
+
+---
+
+## Automatic archiving
+
+The workspace stays tidy without manual housekeeping:
+
+- **Validated plans** — `dokoro_plan_validate` auto-archives a validated plan to `.mcp/plans/archive/YYYY-MM/`. Archived plans stay readable: `dokoro_plan_list` still lists them marked **(archived)**, and write tools refuse with a read-only error.
+- **Opportunistic sweep** — `dokoro_workspace_claim` runs a conservative sweep: `daily/*.md` older than **7 days** (never the current ISO week, never files with a live claim) move to `archive/daily/YYYY-Www/`, and completed/validated plans older than **30 days** are archived.
+- **On demand** — `dokoro_archive_sweep` runs the same sweep manually, with `dryRun:true` to preview and `status_only:true` to read `.mcp/archive-status.json` from the last run.
+
+The sweep is a singleton (`.mcp/archive.lock`, 5-minute TTL — a crashed sweep's lock is broken automatically), index writes are atomic (temp file + rename), and every non-dry run records its results in `.mcp/archive-status.json`.
+
+```
+dokoro/
+├── daily/                          # live session logs (current week + last 7 days)
+├── archive/daily/2026-W20/         # swept daily files, partitioned by ISO week
+└── .mcp/plans/
+    ├── my-plan.json                # live plans
+    └── archive/2026-06/            # finished plans, partitioned by month (read-only)
+```
+
+Filenames share one UTC slug — `YYYY-MM-DD-HHhMM-dayname` (e.g. `2026-06-10-22h23-wednesday`): session dumps are `<slug>-session-<topic>.md`, plan validation reports are `<slug>-validation-<planId>.md`.
+
+---
+
+## Browse it from the terminal
+
+`dokoro browse` opens an interactive TUI over the whole memory folder — current workspace, daily sessions, weekly retrospectives, the archive, plans, file claims, agent presence, and the last sweep status:
+
+```bash
+npx dokoro browse                # auto-discovers the dokoro folder
+npx dokoro browse --path=dokoro  # or point at one explicitly
+```
+
+Navigate with `↑`/`↓` and `enter`, go back with `esc`, filter-as-you-type with `/`, and scroll inside previews. In a non-TTY context (pipes, CI) it prints a static category summary instead.
 
 ---
 

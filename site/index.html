@@ -446,7 +446,7 @@ footer .meta b{color:var(--text);font-weight:700}
     <div class="stat-row fade" style="animation-delay:.78s">
       <div class="stat"><div class="n c">5</div><div class="l">Memory layers</div></div>
       <div class="stat"><div class="n">3</div><div class="l">Storage backends</div></div>
-      <div class="stat"><div class="n">40</div><div class="l">MCP tools</div></div>
+      <div class="stat"><div class="n">44</div><div class="l">MCP tools</div></div>
       <div class="stat"><div class="n">2</div><div class="l">Native edges*</div></div>
     </div>
   </div>
@@ -469,6 +469,7 @@ claude mcp add dokoro -- npx -y dokoro
 <span class="c"># CLI subcommands</span>
 npx dokoro init        <span class="c"># scaffold the .dokoro workspace</span>
 npx dokoro migrate     <span class="c"># run DB migrations</span>
+npx dokoro browse      <span class="c"># interactive memory browser (TUI)</span>
 
 <span class="c"># lean install — skip the ~100MB native vector deps (lazy-loaded)</span>
 npm install --omit=optional</pre>
@@ -728,7 +729,7 @@ npm install --omit=optional</pre>
         <div id="layerChips"></div>
       </div>
     </div>
-    <div class="tools-meta reveal">Showing <b id="toolCount">0</b> of 40 entries</div>
+    <div class="tools-meta reveal">Showing <b id="toolCount">0</b> of 44 entries</div>
     <div class="tool-grid" id="toolGrid"></div>
   </div>
 </section>
@@ -747,7 +748,7 @@ npm install --omit=optional</pre>
           <tr><th>Project</th><th>Architecture</th><th style="text-align:center">Native temporal</th><th style="text-align:center">Native affective</th><th style="text-align:center">Native multi-agent</th><th style="text-align:center">Concurrent access</th></tr>
         </thead>
         <tbody>
-          <tr class="me-row"><td class="me">dokoro</td><td>SQLite + LanceDB + entity graph</td><td class="yes">✓ bi-temporal</td><td class="yes">✓ agent_feedback</td><td class="yes">✓ shared editable blocks + handoff</td><td class="yes">✓ WAL + busy_timeout=5000</td></tr>
+          <tr class="me-row"><td class="me">dokoro</td><td>SQLite + LanceDB + entity graph</td><td class="yes">✓ bi-temporal</td><td class="yes">✓ agent_feedback</td><td class="yes">✓ shared editable blocks + handoff + advisory file claims</td><td class="yes">✓ WAL + busy_timeout=5000</td></tr>
           <tr><td>Mem0</td><td>Vector + optional graph</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
           <tr><td>Letta (MemGPT)</td><td>Tiered, OS-like, self-editing</td><td class="partial">◐ via metadata</td><td class="partial">◐ via metadata</td><td class="partial">◐ shared blocks</td><td class="no">—</td></tr>
           <tr><td>Zep / Graphiti</td><td>Temporal knowledge graph</td><td class="yes">✓ bi-temporal</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
@@ -774,6 +775,8 @@ npm install --omit=optional</pre>
       <div class="prin reveal"><div class="pi">iv · STORAGE</div><h3>Right tool per job</h3><p>SQLite for structure, LanceDB for vectors, files for human-readable state — fused by Reciprocal Rank Fusion.</p></div>
       <div class="prin reveal"><div class="pi">v · DEGRADE</div><h3>Runs <em>without</em> Ollama</h3><p>No local LLM? Regex extraction takes over and recall falls back to recency. Nothing hard-fails.</p></div>
       <div class="prin reveal"><div class="pi">vi · BRIDGE</div><h3>Zero cost when off</h3><p>Three opt-in tools wire tachibot's multi-model output into memory. Disabled by default.</p></div>
+      <div class="prin reveal"><div class="pi">vii · CLAIMS</div><h3>Multi-agent <em>file claims</em></h3><p>Advisory per-file leases (<code>dokoro_file_claim</code>, default 300s) so agents sharing a worktree see who is editing what. Conflicts warn — they never block — and expired or dead-holder claims are taken over.</p></div>
+      <div class="prin reveal"><div class="pi">viii · BROWSE</div><h3><em>dokoro browse</em></h3><p>An interactive terminal browser over the whole memory folder — sessions, plans, archive, file claims, agent presence — with <code>/</code> filter-as-you-type and scrolling previews. Falls back to a static summary when not a TTY.</p></div>
     </div>
   </div>
 </section>
@@ -834,7 +837,7 @@ const LAYERS = {
     desc:"A per-tool, per-agent <b>track record</b> — success, failure, latency, confidence. Wilson-ranked and recency-decayed into a routing policy the agent can actually trust.",
     ex:"entity_extract_deep · 88% success · prefer over regex",
     where:"agent_feedback"},
-  other:{label:"Setup", color:"var(--faint)", q:"Init &amp; assets", where:"db bootstrap · assets/*"},
+  other:{label:"Setup", color:"var(--faint)", q:"Init · assets · archive", where:"db bootstrap · assets/* · archive/"},
   bridge:{label:"Bridge", color:"var(--accent)", q:"tachibot ↔ dokoro", where:"opt-in · DOKORO_ENABLE_TACHIBOT_BRIDGE"}
 };
 
@@ -854,6 +857,9 @@ const TOOLS = [
   {n:"dokoro_handoff_claim",     l:"working", st:"handoffs",      d:"Atomically claim a handoff so only one agent takes it."},
   {n:"dokoro_presence_ping",     l:"working", st:"agent_presence", d:"Heartbeat: announce this agent is active (upsert, server clock)."},
   {n:"dokoro_presence_list",     l:"working", st:"agent_presence", d:"List agents live within the TTL (read-time liveness, no sweeper)."},
+  {n:"dokoro_file_claim",        l:"working", st:"file_claims",    d:"Advisory per-file claim with a lease (default 300s) — warns other agents, never blocks. All-or-nothing; expired or dead-holder claims are taken over."},
+  {n:"dokoro_file_release",      l:"working", st:"file_claims",    d:"Release your file claims — specific paths or all of them. Owner-aware and idempotent."},
+  {n:"dokoro_claim_list",        l:"working", st:"file_claims",    d:"List open file claims with holder liveness (live / stale / unknown via agent_presence)."},
   {n:"dokoro_question_add",     l:"working",  st:"questions.json",d:"Record an open question during development."},
   {n:"dokoro_question_answer",  l:"working",  st:"questions.json",d:"Answer a previously logged question."},
   {n:"dokoro_question_list",    l:"working",  st:"questions.json",d:"List all tracked questions."},
@@ -873,6 +879,7 @@ const TOOLS = [
   {n:"dokoro_feedback_route",   l:"affective",st:"agent_feedback",d:"Ranked track record — Wilson lower bound + recency decay turn outcomes into a routing policy."},
   {n:"dokoro_feedback_query",   l:"affective",st:"agent_feedback",d:"Raw per-tool success rates, recent failures, agent-specific stats."},
   {n:"dokoro_init",             l:"other",    st:"bootstrap",     d:"Initialize the dokoro workspace and database."},
+  {n:"dokoro_archive_sweep",    l:"other",    st:"archive/",      d:"Sweep stale daily files and finished plans into the archive — dryRun previews, status_only reads the last run."},
   {n:"dokoro_save_image",       l:"other",    st:"assets/*",      d:"Save an image asset (base64 or URL)."},
   {n:"dokoro_save_file",        l:"other",    st:"assets/*",      d:"Save a file asset."},
   {n:"dokoro_list_assets",      l:"other",    st:"assets/*",      d:"List saved assets."},
