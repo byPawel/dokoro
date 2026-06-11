@@ -5,7 +5,7 @@
  *
  * Keys: ↑/↓ move (scroll in preview), PgUp/PgDn page in preview, enter open,
  * esc/backspace back (esc at the category level quits), `/` filter-as-you-type
- * on the items list (case-insensitive substring on label+sublabel; esc clears),
+ * on the items list (fuzzy match on label+sublabel (exact substrings rank first); esc clears),
  * q quits anywhere — except while typing a filter, where q is a literal char.
  *
  * All data comes from src/cli/browse-data.ts (pure, never throws). The preview
@@ -23,6 +23,7 @@ import {
   type BrowseCategory,
   type BrowseItem,
 } from './browse-data.js';
+import { fuzzyFilter } from './fuzzy.js';
 import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 
 type Level = 'categories' | 'items' | 'preview';
@@ -110,13 +111,10 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     void listCategories(dokoroPath).then(setCategories);
   }, [dokoroPath]);
 
-  const filteredItems = useMemo(() => {
-    if (filter === '') return items;
-    const q = filter.toLowerCase();
-    return items.filter(
-      (i) => i.label.toLowerCase().includes(q) || (i.sublabel ?? '').toLowerCase().includes(q),
-    );
-  }, [items, filter]);
+  const filteredItems = useMemo(
+    () => fuzzyFilter(items, filter, (i) => `${i.label} ${i.sublabel ?? ''}`),
+    [items, filter],
+  );
 
   const safeItemIndex = Math.max(0, Math.min(itemIndex, filteredItems.length - 1));
   const maxScroll = Math.max(0, contentLines.length - viewport);
