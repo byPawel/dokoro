@@ -268,7 +268,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     body = (
       <Box flexDirection="column">
         {visible.map((line, i) => (
-          <Text key={scroll + i} wrap="truncate-end">
+          <Text key={i} wrap="truncate-end">
             {lineText(line) === '' ? ' ' : line.map((s, j) => (
               <Text key={j} color={s.color} bold={s.bold} dimColor={s.dim} italic={s.italic}>
                 {s.text}
