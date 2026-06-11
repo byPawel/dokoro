@@ -144,9 +144,20 @@ async function savePlan(plan: Plan): Promise<void> {
   await savePlansIndex(index);
 }
 
-// Generate short ID
-function generateId(): string {
-  return `plan-${Date.now().toString(36)}`;
+/**
+ * Sortable, human-readable plan id: `plan-<YYYY-MM-DD-HHhMM-dayname>-<title-slug>`
+ * (e.g. `plan-2026-06-11-23h10-thursday-supertemplates-growth`). The timestamp
+ * prefix sorts chronologically as a plain string, matching the daily-file slug
+ * convention. Old base36 ids (`plan-mq5kmgs2`) keep working — the index and
+ * archive treat ids as opaque strings.
+ */
+function generateId(title: string): string {
+  const slug = title.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 40);
+  const stamp = formatTimestampSlug(new Date());
+  return slug === '' ? `plan-${stamp}` : `plan-${stamp}-${slug}`;
 }
 
 // Calculate completion percentage
@@ -234,7 +245,7 @@ export const planTools: ToolDefinition[] = [
     handler: async ({ title, items, description }): Promise<CallToolResult> => {
       const now = new Date().toISOString();
       const plan: Plan = {
-        id: generateId(),
+        id: generateId(title),
         title,
         description,
         items: items.map((text: string, idx: number) => ({
