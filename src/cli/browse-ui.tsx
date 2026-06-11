@@ -3,7 +3,7 @@
  *
  *   categories ──enter──▶ items ──enter──▶ content preview
  *
- * Keys: ↑/↓ move (scroll in preview), PgUp/PgDn page in preview, enter open,
+ * Keys: ↑/↓ move (scroll in preview), PgUp/PgDn page in preview, enter/→ open,
  * esc/backspace back (esc at the category level quits), `/` filter-as-you-type
  * on the items list (fuzzy match on label+sublabel (exact substrings rank first); esc clears),
  * q quits anywhere — except while typing a filter, where q is a literal char.
@@ -371,12 +371,12 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       if (categories === null || categories.length === 0) return;
       if (key.upArrow) { setCatIndex((i) => Math.max(0, i - 1)); return; }
       if (key.downArrow) { setCatIndex((i) => Math.min(categories.length - 1, i + 1)); return; }
-      if (key.return) openCategory(categories[Math.min(catIndex, categories.length - 1)]);
+      if (key.return || key.rightArrow) openCategory(categories[Math.min(catIndex, categories.length - 1)]);
       return;
     }
 
     if (level === 'items') {
-      if (key.escape || key.backspace || key.delete) {
+      if (key.escape || key.backspace || key.delete || key.leftArrow) {
         if (searchSnapshot !== null) {
           setItems(searchSnapshot);
           setSearchSnapshot(null);
@@ -409,7 +409,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       if (input === 's') { setTypingSearch(true); setSearchQuery(''); return; }
       if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
       if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
-      if (key.return) {
+      if (key.return || key.rightArrow) {
         // No-op on an empty (filtered) list — never index into nothing.
         if (filteredItems.length === 0) return;
         openItem(filteredItems[safeItemIndex]);
@@ -418,7 +418,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     }
 
     // Preview level: scroll.
-    if (key.escape || key.backspace || key.delete) { setLevel('items'); return; }
+    if (key.escape || key.backspace || key.delete || key.leftArrow) { setLevel('items'); return; }
     if (key.upArrow) { setScroll((s) => Math.max(0, s - 1)); return; }
     if (key.downArrow) { setScroll((s) => Math.min(maxScroll, s + 1)); return; }
     if (key.pageUp) { setScroll((s) => Math.max(0, s - viewport)); return; }
@@ -435,7 +435,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   let hint: string;
 
   if (level === 'categories') {
-    hint = '↑/↓ move · enter open · q/esc quit';
+    hint = '↑/↓ move · enter/→ open · q/esc quit';
     if (categories === null) {
       body = <Text color="gray">Loading…</Text>;
     } else {
@@ -462,7 +462,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       : filter !== ''
         ? `filter: ${filter} (esc clears) · `
         : '';
-    const escHint = searchSnapshot !== null ? 'esc restore list' : 'esc/⌫ back';
+    const escHint = searchSnapshot !== null ? 'esc restore list' : 'esc/⌫/← back';
     if (confirm !== null) {
       hint = confirmHint(confirm);
     } else if (typingSearch) {
@@ -470,7 +470,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     } else {
       hint = typingFilter
         ? filterHint
-        : `${filterHint}↑/↓ move · enter open · / filter · s search · ${escHint} · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+        : `${filterHint}↑/↓ move · enter/→ open · / filter · s search · ${escHint} · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
     }
     if (filteredItems.length === 0) {
       body = (
@@ -504,7 +504,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     // confirm-mode swallows all keys, so a hidden prompt would look dead.
     hint = confirm !== null
       ? confirmHint(confirm)
-      : `↑/↓ scroll · PgUp/PgDn page · esc/⌫ back · q quit${lineInfo}`;
+      : `↑/↓ scroll · PgUp/PgDn page · esc/⌫/← back · q quit${lineInfo}`;
     const visible = contentLines.slice(scroll, scroll + viewport);
     body = (
       <Box flexDirection="column">
