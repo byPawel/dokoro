@@ -562,7 +562,7 @@ export const workspaceTools: ToolDefinition[] = [
           stopHeartbeat();
           // Best-effort claim hygiene on graceful session end; TTL expiry remains
           // the safety net for crashed sessions.
-          if (sessionId !== null) releaseClaimsForSession(sessionId);
+          if (sessionId !== null) void releaseClaimsForSession(sessionId);
           await fs.unlink(workspace.path);
         } else {
           // Just update the workspace to show it was dumped
