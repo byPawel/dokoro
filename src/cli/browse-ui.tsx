@@ -188,6 +188,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const selectedIdRef = useRef<string | null>(null);
   const contentRef = useRef<MdLine[]>([]);
   contentRef.current = contentLines;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
 
   // Toast auto-clear; replaced toasts restart the timer.
   useEffect(() => {
@@ -319,7 +321,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       if (changed.size === 0) return;
       setContentLines(nextLines);
       // Shrinking content can strand the scroll past the new end — clamp it.
-      setScroll((s) => Math.min(s, Math.max(0, nextLines.length - viewport)));
+      setScroll((s) => Math.min(s, Math.max(0, nextLines.length - viewportRef.current)));
       setPulseLines(changed);
     };
 
