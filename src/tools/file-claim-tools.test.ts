@@ -6,7 +6,7 @@ jest.mock('../db/index.js', () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { fileClaimTools } = require('./file-claim-tools.js') as typeof import('./file-claim-tools.js');
+const { fileClaimTools, releaseClaimsForSession } = require('./file-claim-tools.js') as typeof import('./file-claim-tools.js');
 
 const ROOT = '/repo';
 
@@ -297,5 +297,48 @@ describe('file-claim-tools', () => {
     const keys = (db.prepare('SELECT claim_key FROM file_claims ORDER BY claim_key').all() as Array<{ claim_key: string }>)
       .map((r) => r.claim_key);
     expect(keys).toEqual(['src/fresh-open.ts', 'src/fresh-released.ts', 'src/trigger.ts']);
+  });
+
+  describe('releaseClaimsForSession', () => {
+    const insertClaim = (claimKey: string, sessionId: string | null, releasedAt: number | null): void => {
+      const t = now();
+      db.prepare(`
+        INSERT INTO file_claims (claim_key, file_path, agent_id, session_id, claimed_at, expires_at, heartbeat_seq, released_at)
+        VALUES (?, ?, 'alice', ?, ?, ?, 0, ?)
+      `).run(claimKey, claimKey, sessionId, t, t + 300, releasedAt);
+    };
+
+    it('releases only open claims with the matching session_id', () => {
+      insertClaim('src/a.ts', 'sess-1', null);          // open, sess-1 -> released
+      insertClaim('src/b.ts', 'sess-1', null);          // open, sess-1 -> released
+      insertClaim('src/c.ts', 'sess-2', null);          // open, other session -> untouched
+      insertClaim('src/d.ts', 'sess-1', now() - 10);    // already released -> untouched
+
+      expect(releaseClaimsForSession('sess-1')).toBe(2);
+
+      const openKeys = (db.prepare('SELECT claim_key FROM file_claims WHERE released_at IS NULL ORDER BY claim_key')
+        .all() as Array<{ claim_key: string }>).map((r) => r.claim_key);
+      expect(openKeys).toEqual(['src/c.ts']);
+      expect(getRow('src/a.ts')!.released_at).not.toBeNull();
+      expect(getRow('src/b.ts')!.released_at).not.toBeNull();
+    });
+
+    it('is idempotent and returns 0 on a second run', () => {
+      insertClaim('src/a.ts', 'sess-1', null);
+      expect(releaseClaimsForSession('sess-1')).toBe(1);
+      expect(releaseClaimsForSession('sess-1')).toBe(0);
+      expect(releaseClaimsForSession('sess-never-existed')).toBe(0);
+    });
+
+    it('returns 0 instead of throwing when the DB is unavailable', () => {
+      // Remove the injected test DB; getSqliteDb is mocked to throw in this
+      // suite, so the resolver cannot create a real DB file on disk.
+      delete (globalThis as Record<string, unknown>).__TEST_DB__;
+      try {
+        expect(releaseClaimsForSession('sess-1')).toBe(0);
+      } finally {
+        (globalThis as Record<string, unknown>).__TEST_DB__ = db;
+      }
+    });
   });
 });

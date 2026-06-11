@@ -37,6 +37,7 @@ import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 import { formatTimestampSlug } from '../utils/timestamp.js';
 import { sweepWorkspace } from '../utils/archive.js';
+import { releaseClaimsForSession } from './file-claim-tools.js';
 
 /**
  * Opportunistic archive sweep on workspace claim. NEVER fails the claim:
@@ -417,8 +418,11 @@ export const workspaceTools: ToolDefinition[] = [
       }
       
       const { agentId } = parseAgentFromContent(workspace.content);
-      // const sessionIdMatch = workspace.content.match(/session_id:\s*"([^"]+)"/);
-      // const _sessionId = sessionIdMatch ? sessionIdMatch[1] : 'unknown';
+      const sessionIdMatch = workspace.content.match(/session_id:\s*"([^"]+)"/);
+      const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
+      // Best-effort claim hygiene on graceful session end; TTL expiry remains
+      // the safety net for crashed sessions.
+      if (sessionId !== null) releaseClaimsForSession(sessionId);
       
       // Flush any pending tool tracking
       await flushToolTracking();
