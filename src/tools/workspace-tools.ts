@@ -420,9 +420,6 @@ export const workspaceTools: ToolDefinition[] = [
       const { agentId } = parseAgentFromContent(workspace.content);
       const sessionIdMatch = workspace.content.match(/session_id:\s*"([^"]+)"/);
       const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
-      // Best-effort claim hygiene on graceful session end; TTL expiry remains
-      // the safety net for crashed sessions.
-      if (sessionId !== null) releaseClaimsForSession(sessionId);
       
       // Flush any pending tool tracking
       await flushToolTracking();
@@ -563,6 +560,9 @@ export const workspaceTools: ToolDefinition[] = [
           await releaseLock(agentId || '');
           await disableToolTracking();
           stopHeartbeat();
+          // Best-effort claim hygiene on graceful session end; TTL expiry remains
+          // the safety net for crashed sessions.
+          if (sessionId !== null) releaseClaimsForSession(sessionId);
           await fs.unlink(workspace.path);
         } else {
           // Just update the workspace to show it was dumped
