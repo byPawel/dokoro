@@ -169,7 +169,10 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     setSpinnerOn(false);
     setToast(outcome.note);
     if (!outcome.ok) return;
-    setSearchSnapshot((prev) => prev ?? items);
+    // itemsRef, not the render-time `items` capture: a watcher reload can
+    // refresh the list during the (up to 5s) await, and esc must restore
+    // the CURRENT list, not a stale one.
+    setSearchSnapshot((prev) => prev ?? itemsRef.current);
     setItems(outcome.items);
     setItemIndex(0);
     setFilter('');
@@ -178,6 +181,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const searchSnapshotRef = useRef(searchSnapshot);
   searchSnapshotRef.current = searchSnapshot;
   const selectedIdRef = useRef<string | null>(null);

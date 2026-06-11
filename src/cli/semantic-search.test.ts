@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 describe('semanticSearchItems', () => {
   afterEach(() => {
+    jest.useRealTimers();
     jest.resetModules();
     jest.dontMock('../services/vector-service.js');
     jest.dontMock('../db/index.js');
@@ -50,5 +51,34 @@ describe('semanticSearchItems', () => {
     const second = await semanticSearchItems('/proj', 'q');
     expect(second.ok).toBe(false);
     expect(second.note).toContain('cooling down');
+  });
+
+  it('a hung search times out after 5s and trips the cooldown breaker', async () => {
+    jest.doMock('../services/vector-service.js', () => ({
+      createVectorServices: () => ({
+        // Never resolves — only the timeout can settle the race.
+        searchService: { search: () => new Promise(() => { /* hang */ }) },
+      }),
+    }));
+    jest.doMock('../db/index.js', () => ({ getSqliteDb: () => ({}) }));
+    const { semanticSearchItems, resetSemanticCooldown } = await import('./semantic-search.js');
+    resetSemanticCooldown();
+
+    // Modern fake timers also mock Date.now(), so the cooldown window set by
+    // the timeout failure is still in the future for the immediate second call.
+    jest.useFakeTimers();
+    try {
+      const pending = semanticSearchItems('/proj', 'q');
+      await jest.advanceTimersByTimeAsync(5001);
+      const first = await pending;
+      expect(first.ok).toBe(false);
+      expect(first.note).toContain('timed out');
+
+      const second = await semanticSearchItems('/proj', 'q');
+      expect(second.ok).toBe(false);
+      expect(second.note).toContain('cooling down');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
