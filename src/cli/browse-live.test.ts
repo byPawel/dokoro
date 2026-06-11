@@ -19,11 +19,13 @@ describe('watchDirs', () => {
 
   it('coalesces rapid writes into one dirty callback (debounce)', async () => {
     const onDirty = jest.fn();
-    const handle = watchDirs([dir], onDirty, { debounceMs: 50, reconcileMs: 60_000 });
+    // debounceMs is generous: under CI/machine load the three awaited writes
+    // can land >50ms apart, splitting into two debounce windows (observed flake).
+    const handle = watchDirs([dir], onDirty, { debounceMs: 150, reconcileMs: 60_000 });
     await fs.writeFile(path.join(dir, 'a.md'), '1');
     await fs.writeFile(path.join(dir, 'a.md'), '2');
     await fs.writeFile(path.join(dir, 'b.md'), '3');
-    await sleep(300);
+    await sleep(500);
     handle.stop();
     expect(onDirty).toHaveBeenCalledTimes(1);
   });

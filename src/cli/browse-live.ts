@@ -11,6 +11,7 @@
 
 import { watch, type FSWatcher } from 'fs';
 
+/** Handle to a live-refresh loop; stop() tears down timers/watchers and prevents further callbacks. */
 export interface LiveHandle {
   stop(): void;
 }
@@ -22,6 +23,7 @@ export interface WatchOptions {
   reconcileMs?: number;
 }
 
+/** Watches directories (never files) and fires debounced dirty hints, with a slow reconcile tick as a safety net. */
 export function watchDirs(
   dirs: string[],
   onDirty: () => void,
@@ -38,8 +40,11 @@ export function watchDirs(
     if (debounce !== null) clearTimeout(debounce);
     debounce = setTimeout(() => {
       debounce = null;
+      // LOAD-BEARING: clearTimeout in stop() is best-effort — a timer that
+      // already expired in the same tick still runs its callback.
       if (!stopped) onDirty();
     }, debounceMs);
+    debounce.unref();
   };
 
   for (const dir of dirs) {
@@ -55,6 +60,7 @@ export function watchDirs(
   const reconcile = setInterval(() => {
     if (!stopped) onDirty();
   }, reconcileMs);
+  reconcile.unref();
 
   return {
     stop(): void {
@@ -66,6 +72,7 @@ export function watchDirs(
   };
 }
 
+/** Runs tick on a recursive setTimeout loop so ticks never overlap; tick errors are swallowed. */
 export function startPolling(intervalMs: number, tick: () => Promise<void>): LiveHandle {
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
@@ -77,6 +84,7 @@ export function startPolling(intervalMs: number, tick: () => Promise<void>): Liv
         .catch(() => { /* poll errors are non-fatal; next tick retries */ })
         .finally(() => loop());
     }, intervalMs);
+    timer.unref();
   };
 
   loop();
