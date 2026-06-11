@@ -10,6 +10,9 @@
  * On the items list, `a` archives the selected live plan or daily file and
  * `w` archives a daily file into its weekly archive — both behind a footer
  * y/n confirm (current-week daily files need a second, force-armed confirm).
+ * `s` opens semantic search: type a query, enter runs a hybrid (FTS5+vector)
+ * search via src/cli/semantic-search.ts and swaps the list for the results;
+ * esc/⌫ restores the original list.
  *
  * All data comes from src/cli/browse-data.ts (pure, never throws). The preview
  * renders markdown files as styled spans via src/cli/markdown-ansi.ts; other
@@ -30,6 +33,7 @@ import {
 } from './browse-data.js';
 import { startPolling, watchDirs } from './browse-live.js';
 import { fuzzyFilter } from './fuzzy.js';
+import { semanticSearchItems } from './semantic-search.js';
 import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 import { archiveDailyFile, archivePlan } from '../utils/archive.js';
 import { DOKORO_PATH } from '../shared/dokoro-utils.js';
@@ -115,12 +119,14 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const [contentLines, setContentLines] = useState<MdLine[]>([]);
   const [scroll, setScroll] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
-  // setSpinnerOn gets its producer (async load wiring) in a follow-up task.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [spinnerOn, setSpinnerOn] = useState(false);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [pulseLines, setPulseLines] = useState<ReadonlySet<number>>(new Set());
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  // Semantic search: snapshot of the pre-search items (null = not searching).
+  const [searchSnapshot, setSearchSnapshot] = useState<BrowseItem[] | null>(null);
+  const [typingSearch, setTypingSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Run a confirmed archive. A 'currentWeek' refusal escalates to a second,
   // force-armed confirm instead of toasting. The live-refresh watcher picks
@@ -152,9 +158,28 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       setToast(`archive failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
+
+  // Run a semantic search and swap the items list for the results. The
+  // snapshot keeps the original list so esc can restore it; failures only
+  // toast (the breaker in semantic-search.ts handles repeated ones).
+  const runSemanticSearch = async (query: string): Promise<void> => {
+    setSpinnerOn(true);
+    // projectPath convention mirrors browse-data's tryDb: parent of the dokoro folder.
+    const outcome = await semanticSearchItems(path.dirname(dokoroPath), query);
+    setSpinnerOn(false);
+    setToast(outcome.note);
+    if (!outcome.ok) return;
+    setSearchSnapshot((prev) => prev ?? items);
+    setItems(outcome.items);
+    setItemIndex(0);
+    setFilter('');
+  };
+
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  const searchSnapshotRef = useRef(searchSnapshot);
+  searchSnapshotRef.current = searchSnapshot;
   const selectedIdRef = useRef<string | null>(null);
   const contentRef = useRef<MdLine[]>([]);
   contentRef.current = contentLines;
@@ -209,6 +234,9 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       setItemIndex(0);
       setFilter('');
       setTypingFilter(false);
+      setSearchSnapshot(null);
+      setTypingSearch(false);
+      setSearchQuery('');
       setLevel('items');
     });
   };
@@ -230,6 +258,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     const categoryId = selectedCategory.id;
 
     const reload = async (): Promise<void> => {
+      // Semantic results on screen — a live reload would overwrite them.
+      if (searchSnapshotRef.current !== null) return;
       const list = await listItems(dokoroPath, categoryId);
       let nextIndex: number | null = null;
       setItems((prev) => {
@@ -303,6 +333,19 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       return;
     }
 
+    // Search typing mode: printable chars are literal query text; enter runs.
+    if (level === 'items' && typingSearch) {
+      if (key.escape) { setSearchQuery(''); setTypingSearch(false); return; }
+      if (key.return) {
+        setTypingSearch(false);
+        if (searchQuery.trim() !== '') void runSemanticSearch(searchQuery.trim());
+        return;
+      }
+      if (key.backspace || key.delete) { setSearchQuery((q) => q.slice(0, -1)); return; }
+      if (input !== '' && !key.ctrl && !key.meta) setSearchQuery((q) => q + input);
+      return;
+    }
+
     // Filter typing mode: printable chars (incl. 'q') are literal filter text.
     if (level === 'items' && typingFilter) {
       if (key.escape) { setFilter(''); setTypingFilter(false); return; }
@@ -327,6 +370,12 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
 
     if (level === 'items') {
       if (key.escape || key.backspace || key.delete) {
+        if (searchSnapshot !== null) {
+          setItems(searchSnapshot);
+          setSearchSnapshot(null);
+          setItemIndex(0);
+          return;
+        }
         if (filter !== '') { setFilter(''); setItemIndex(0); return; }
         setLevel('categories');
         return;
@@ -350,6 +399,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         setToast(input === 'a' ? 'not archivable' : 'w archives daily files only');
         return;
       }
+      if (input === 's') { setTypingSearch(true); setSearchQuery(''); return; }
       if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
       if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
       if (key.return) {
@@ -405,12 +455,15 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       : filter !== ''
         ? `filter: ${filter} (esc clears) · `
         : '';
+    const escHint = searchSnapshot !== null ? 'esc restore list' : 'esc/⌫ back';
     if (confirm !== null) {
       hint = confirmHint(confirm);
+    } else if (typingSearch) {
+      hint = `search: ${searchQuery}▌ (enter run · esc cancel)`;
     } else {
       hint = typingFilter
         ? filterHint
-        : `${filterHint}↑/↓ move · enter open · / filter · esc/⌫ back · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+        : `${filterHint}↑/↓ move · enter open · / filter · s search · ${escHint} · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
     }
     if (filteredItems.length === 0) {
       body = (
