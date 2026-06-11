@@ -24,6 +24,22 @@ describe('fuzzyScore', () => {
     expect(fuzzyScore('PLAN', 'my-plan')).toEqual(fuzzyScore('plan', 'MY-PLAN'));
   });
 
+  it('returns 0 for an empty query', () => {
+    expect(fuzzyScore('', 'anything')).toBe(0);
+  });
+
+  it('matches non-BMP characters (emoji) as whole codepoints', () => {
+    expect(fuzzyScore('🎉x', 'a🎉x')).not.toBeNull();
+    // Forces the subsequence path: '🎉x' is not a contiguous substring here.
+    expect(fuzzyScore('🎉x', '🎉zzzx')).not.toBeNull();
+  });
+
+  it('subsequence boundary bonus increases score', () => {
+    const withBoundary = fuzzyScore('pn', 'p-note');
+    const withoutBoundary = fuzzyScore('pn', 'xp-note');
+    expect(withBoundary as number).toBeGreaterThan(withoutBoundary as number);
+  });
+
   it('hides weak scattered matches below the threshold', () => {
     // 'a' at idx 2 preceded by 'x' (no boundary), 'e' at idx 6 preceded by 'x',
     // not consecutive → 1+1=2 < 4 → null (threshold is q.length * 2 = 4)
