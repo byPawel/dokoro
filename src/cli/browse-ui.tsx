@@ -175,15 +175,18 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
 
     const reload = async (): Promise<void> => {
       const list = await listItems(dokoroPath, categoryId);
+      let nextIndex: number | null = null;
       setItems((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(list)) return prev;
         const visible = fuzzyFilter(list, filterRef.current, (i) => `${i.label} ${i.sublabel ?? ''}`);
         const pos = selectedIdRef.current === null
           ? -1
           : visible.findIndex((i) => i.id === selectedIdRef.current);
-        setItemIndex(pos >= 0 ? pos : 0);
+        nextIndex = pos >= 0 ? pos : 0;
         return list;
       });
+      // Outside the updater (which must stay pure) but in the same batch.
+      if (nextIndex !== null) setItemIndex(nextIndex);
     };
 
     const dirs = dirsForCategory(dokoroPath, categoryId);
@@ -224,6 +227,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       }
       if (changed.size === 0) return;
       setContentLines(nextLines);
+      // Shrinking content can strand the scroll past the new end — clamp it.
+      setScroll((s) => Math.min(s, Math.max(0, nextLines.length - viewport)));
       setPulseLines(changed);
     };
 

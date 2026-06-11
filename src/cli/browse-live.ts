@@ -80,6 +80,9 @@ export function startPolling(intervalMs: number, tick: () => Promise<void>): Liv
   const loop = (): void => {
     if (stopped) return;
     timer = setTimeout(() => {
+      // LOAD-BEARING: clearTimeout in stop() is best-effort — a timer that
+      // already expired in the same tick still runs its callback.
+      if (stopped) return;
       void tick()
         .catch(() => { /* poll errors are non-fatal; next tick retries */ })
         .finally(() => loop());
