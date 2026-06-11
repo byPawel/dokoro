@@ -46,6 +46,15 @@ interface ConfirmState {
   force: boolean;
 }
 
+/** Footer prompt for a pending archive confirm. Used by BOTH the items- and
+ * preview-level hints: an in-flight openItem can resolve after a confirm is
+ * set, flipping the level to 'preview' while the prompt must stay visible. */
+function confirmHint(c: ConfirmState): string {
+  return c.force
+    ? `⚠ "${c.label}" is CURRENT WEEK — archive anyway? y/n`
+    : `Archive "${c.label}"? y/n`;
+}
+
 /** Visible window of a list, centered on the selection. */
 function windowSlice<T>(list: T[], selected: number, height: number): { slice: T[]; start: number } {
   if (list.length <= height) return { slice: list, start: 0 };
@@ -118,23 +127,29 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   // up the resulting file/index changes — no manual reload here.
   const runConfirm = async (c: ConfirmState): Promise<void> => {
     setConfirm(null);
-    if (c.kind === 'plan') {
-      const result = await archivePlan(c.id);
-      setToast(result.ok
-        ? result.alreadyArchived === true ? 'already archived' : `archived: ${c.label}`
-        : `archive failed: ${result.error ?? 'unknown'}`);
-      return;
-    }
-    const result = await archiveDailyFile(c.fileName, { force: c.force });
-    switch (result.outcome) {
-      case 'moved': setToast(`moved to weekly archive: ${c.label}`); break;
-      case 'alreadyArchived': setToast('already archived'); break;
-      case 'claimed': setToast('skipped: file has a live claim'); break;
-      case 'currentWeek':
-        setConfirm({ ...c, force: true });
-        break;
-      case 'missing': setToast('file is gone (already moved?)'); break;
-      case 'failed': setToast(`archive failed: ${result.error ?? 'unknown'}`); break;
+    // archivePlan/archiveDailyFile never throw today, but the call site
+    // discards this promise with `void` — fence regressions into a toast.
+    try {
+      if (c.kind === 'plan') {
+        const result = await archivePlan(c.id);
+        setToast(result.ok
+          ? result.alreadyArchived === true ? 'already archived' : `archived: ${c.label}`
+          : `archive failed: ${result.error ?? 'unknown'}`);
+        return;
+      }
+      const result = await archiveDailyFile(c.fileName, { force: c.force });
+      switch (result.outcome) {
+        case 'moved': setToast(`moved to weekly archive: ${c.label}`); break;
+        case 'alreadyArchived': setToast('already archived'); break;
+        case 'claimed': setToast('skipped: file has a live claim'); break;
+        case 'currentWeek':
+          setConfirm({ ...c, force: true });
+          break;
+        case 'missing': setToast('file is gone (already moved?)'); break;
+        case 'failed': setToast(`archive failed: ${result.error ?? 'unknown'}`); break;
+      }
+    } catch (e: unknown) {
+      setToast(`archive failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
@@ -391,9 +406,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         ? `filter: ${filter} (esc clears) · `
         : '';
     if (confirm !== null) {
-      hint = confirm.force
-        ? `⚠ "${confirm.label}" is CURRENT WEEK — archive anyway? y/n`
-        : `Archive "${confirm.label}"? y/n`;
+      hint = confirmHint(confirm);
     } else {
       hint = typingFilter
         ? filterHint
@@ -427,7 +440,11 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     const lineInfo = contentLines.length > viewport
       ? ` · lines ${scroll + 1}-${Math.min(scroll + viewport, contentLines.length)}/${contentLines.length}`
       : '';
-    hint = `↑/↓ scroll · PgUp/PgDn page · esc/⌫ back · q quit${lineInfo}`;
+    // A confirm set just before openItem resolved must keep its prompt here —
+    // confirm-mode swallows all keys, so a hidden prompt would look dead.
+    hint = confirm !== null
+      ? confirmHint(confirm)
+      : `↑/↓ scroll · PgUp/PgDn page · esc/⌫ back · q quit${lineInfo}`;
     const visible = contentLines.slice(scroll, scroll + viewport);
     body = (
       <Box flexDirection="column">
