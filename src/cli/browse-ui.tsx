@@ -14,15 +14,18 @@
  * static category summary is printed instead of mounting the interactive app.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import path from 'path';
 import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
 import {
+  dirsForCategory,
   listCategories,
   listItems,
   readItemContent,
   type BrowseCategory,
   type BrowseItem,
 } from './browse-data.js';
+import { startPolling, watchDirs } from './browse-live.js';
 import { fuzzyFilter } from './fuzzy.js';
 import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 
@@ -92,6 +95,13 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [spinnerOn, setSpinnerOn] = useState(false);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const [pulseLines, setPulseLines] = useState<ReadonlySet<number>>(new Set());
+  // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const selectedIdRef = useRef<string | null>(null);
+  const contentRef = useRef<MdLine[]>([]);
+  contentRef.current = contentLines;
 
   // Toast auto-clear; replaced toasts restart the timer.
   useEffect(() => {
@@ -125,6 +135,17 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     setItemIndex(0);
   }, [filter]);
 
+  useEffect(() => {
+    selectedIdRef.current = filteredItems[safeItemIndex]?.id ?? null;
+  }, [filteredItems, safeItemIndex]);
+
+  // Pulse decay: cleared 800ms after the last change (repeat changes extend).
+  useEffect(() => {
+    if (pulseLines.size === 0) return;
+    const t = setTimeout(() => setPulseLines(new Set()), 800);
+    return () => clearTimeout(t);
+  }, [pulseLines]);
+
   const openCategory = (cat: BrowseCategory): void => {
     void listItems(dokoroPath, cat.id).then((list) => {
       setSelectedCategory(cat);
@@ -144,6 +165,73 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       setLevel('preview');
     });
   };
+
+  // Live items: file categories rescan on watcher dirty-hints, DB categories
+  // poll. Hash short-circuit keeps unchanged data render-free; the selection
+  // follows its item id across reloads.
+  useEffect(() => {
+    if (level !== 'items' || selectedCategory === null) return;
+    const categoryId = selectedCategory.id;
+
+    const reload = async (): Promise<void> => {
+      const list = await listItems(dokoroPath, categoryId);
+      setItems((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(list)) return prev;
+        const visible = fuzzyFilter(list, filterRef.current, (i) => `${i.label} ${i.sublabel ?? ''}`);
+        const pos = selectedIdRef.current === null
+          ? -1
+          : visible.findIndex((i) => i.id === selectedIdRef.current);
+        setItemIndex(pos >= 0 ? pos : 0);
+        return list;
+      });
+    };
+
+    const dirs = dirsForCategory(dokoroPath, categoryId);
+    const handle = dirs !== null
+      ? watchDirs(dirs, () => { void reload(); })
+      : startPolling(1500, reload);
+    return () => handle.stop();
+  }, [level, selectedCategory, dokoroPath]);
+
+  // Live preview: re-read on dirty-hint/poll, diff lines, pulse the changes.
+  // The seq counter discards reads that resolve after navigation.
+  useEffect(() => {
+    if (level !== 'preview' || selectedItem === null) return;
+    const item = selectedItem;
+    const categoryId = selectedCategory?.id ?? null;
+    let seq = 0;
+
+    const refresh = async (): Promise<void> => {
+      const mySeq = ++seq;
+      let next: string;
+      if (item.detail !== undefined && categoryId !== null) {
+        // DB-backed cards (claims/agents): rebuild from a fresh list.
+        const list = await listItems(dokoroPath, categoryId);
+        const fresh = list.find((i) => i.id === item.id);
+        next = await readItemContent(fresh ?? item);
+      } else {
+        next = await readItemContent(item);
+      }
+      if (mySeq !== seq) return; // stale read — user navigated away
+      const nextLines = toMdLines(item, next);
+      const prev = contentRef.current;
+      const changed = new Set<number>();
+      const max = Math.max(prev.length, nextLines.length);
+      for (let i = 0; i < max; i++) {
+        const a = prev[i] !== undefined ? lineText(prev[i]) : null;
+        const b = nextLines[i] !== undefined ? lineText(nextLines[i]) : null;
+        if (a !== b) changed.add(i);
+      }
+      if (changed.size === 0) return;
+      setContentLines(nextLines);
+      setPulseLines(changed);
+    };
+
+    const handle = item.path !== undefined
+      ? watchDirs([path.dirname(item.path)], () => { void refresh(); })
+      : startPolling(1500, refresh);
+    return () => { seq++; handle.stop(); };
+  }, [level, selectedItem, selectedCategory, dokoroPath]);
 
   useInput((input, key) => {
     // Filter typing mode: printable chars (incl. 'q') are literal filter text.
@@ -268,7 +356,13 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         {visible.map((line, i) => (
           <Text key={i} wrap="truncate-end">
             {lineText(line) === '' ? ' ' : line.map((s, j) => (
-              <Text key={j} color={s.color} bold={s.bold} dimColor={s.dim} italic={s.italic}>
+              <Text
+                key={j}
+                color={pulseLines.has(scroll + i) ? 'yellow' : s.color}
+                bold={pulseLines.has(scroll + i) ? true : s.bold}
+                dimColor={pulseLines.has(scroll + i) ? false : s.dim}
+                italic={s.italic}
+              >
                 {s.text}
               </Text>
             ))}
