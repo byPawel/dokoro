@@ -7,6 +7,9 @@
  * esc/backspace back (esc at the category level quits), `/` filter-as-you-type
  * on the items list (fuzzy match on label+sublabel (exact substrings rank first); esc clears),
  * q quits anywhere — except while typing a filter, where q is a literal char.
+ * On the items list, `a` archives the selected live plan or daily file and
+ * `w` archives a daily file into its weekly archive — both behind a footer
+ * y/n confirm (current-week daily files need a second, force-armed confirm).
  *
  * All data comes from src/cli/browse-data.ts (pure, never throws). The preview
  * renders markdown files as styled spans via src/cli/markdown-ansi.ts; other
@@ -28,8 +31,20 @@ import {
 import { startPolling, watchDirs } from './browse-live.js';
 import { fuzzyFilter } from './fuzzy.js';
 import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
+import { archiveDailyFile, archivePlan } from '../utils/archive.js';
+import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 
 type Level = 'categories' | 'items' | 'preview';
+
+/** Pending archive confirmation (footer y/n prompt). Stores the item's
+ * identity — not its list index — so live reloads can't retarget it. */
+interface ConfirmState {
+  kind: 'plan' | 'daily';
+  id: string;
+  label: string;
+  fileName: string;
+  force: boolean;
+}
 
 /** Visible window of a list, centered on the selection. */
 function windowSlice<T>(list: T[], selected: number, height: number): { slice: T[]; start: number } {
@@ -96,6 +111,32 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const [spinnerOn, setSpinnerOn] = useState(false);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [pulseLines, setPulseLines] = useState<ReadonlySet<number>>(new Set());
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  // Run a confirmed archive. A 'currentWeek' refusal escalates to a second,
+  // force-armed confirm instead of toasting. The live-refresh watcher picks
+  // up the resulting file/index changes — no manual reload here.
+  const runConfirm = async (c: ConfirmState): Promise<void> => {
+    setConfirm(null);
+    if (c.kind === 'plan') {
+      const result = await archivePlan(c.id);
+      setToast(result.ok
+        ? result.alreadyArchived === true ? 'already archived' : `archived: ${c.label}`
+        : `archive failed: ${result.error ?? 'unknown'}`);
+      return;
+    }
+    const result = await archiveDailyFile(c.fileName, { force: c.force });
+    switch (result.outcome) {
+      case 'moved': setToast(`moved to weekly archive: ${c.label}`); break;
+      case 'alreadyArchived': setToast('already archived'); break;
+      case 'claimed': setToast('skipped: file has a live claim'); break;
+      case 'currentWeek':
+        setConfirm({ ...c, force: true });
+        break;
+      case 'missing': setToast('file is gone (already moved?)'); break;
+      case 'failed': setToast(`archive failed: ${result.error ?? 'unknown'}`); break;
+    }
+  };
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -239,6 +280,14 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   }, [level, selectedItem, selectedCategory, dokoroPath]);
 
   useInput((input, key) => {
+    // Pending archive confirm: y runs, n/esc cancels, everything else is
+    // swallowed so stray keys can't navigate or retarget the action.
+    if (confirm !== null) {
+      if (input === 'y' || input === 'Y') { void runConfirm(confirm); return; }
+      if (input === 'n' || input === 'N' || key.escape) { setConfirm(null); return; }
+      return;
+    }
+
     // Filter typing mode: printable chars (incl. 'q') are literal filter text.
     if (level === 'items' && typingFilter) {
       if (key.escape) { setFilter(''); setTypingFilter(false); return; }
@@ -268,6 +317,24 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         return;
       }
       if (input === '/') { setTypingFilter(true); return; }
+      if (input === 'a' || input === 'w') {
+        if (filteredItems.length === 0) return;
+        const item = filteredItems[safeItemIndex];
+        if (item.archived === true) { setToast('already archived'); return; }
+        // archive.ts resolves paths from the module-level DOKORO_PATH; a
+        // --path override would archive against the WRONG tree — refuse.
+        if (dokoroPath !== DOKORO_PATH) { setToast('archive keys disabled for --path overrides'); return; }
+        if (item.kind === 'plan' && input === 'a') {
+          setConfirm({ kind: 'plan', id: item.id, label: item.label, fileName: '', force: false });
+          return;
+        }
+        if (item.kind === 'file' && item.path !== undefined && item.id.startsWith('daily/')) {
+          setConfirm({ kind: 'daily', id: item.id, label: item.label, fileName: path.basename(item.path), force: false });
+          return;
+        }
+        setToast(input === 'a' ? 'not archivable' : 'w archives daily files only');
+        return;
+      }
       if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
       if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
       if (key.return) {
@@ -323,9 +390,15 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       : filter !== ''
         ? `filter: ${filter} (esc clears) · `
         : '';
-    hint = typingFilter
-      ? filterHint
-      : `${filterHint}↑/↓ move · enter open · / filter · esc/⌫ back · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+    if (confirm !== null) {
+      hint = confirm.force
+        ? `⚠ "${confirm.label}" is CURRENT WEEK — archive anyway? y/n`
+        : `Archive "${confirm.label}"? y/n`;
+    } else {
+      hint = typingFilter
+        ? filterHint
+        : `${filterHint}↑/↓ move · enter open · / filter · esc/⌫ back · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+    }
     if (filteredItems.length === 0) {
       body = (
         <Text color="gray">
