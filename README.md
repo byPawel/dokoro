@@ -310,6 +310,18 @@ npx dokoro browse --path=dokoro  # or point at one explicitly
 
 Navigate with `↑`/`↓` and `enter`, go back with `esc`, filter-as-you-type with `/`, and scroll inside previews. In a non-TTY context (pipes, CI) it prints a static category summary instead.
 
+The TUI is a **live dashboard**: plans, daily files, and the current workspace rescan automatically on file changes (atomic-rename-safe directory watching plus a 20s reconcile tick), while claims and agent presence poll every 1.5s. Markdown previews render with colors, and lines that change while you watch — an agent checking off a plan item, a claim renewing — pulse yellow for a moment. Watching a plan's checklist update in real time while an agent codes against it is the whole point.
+
+| Key | Where | Action |
+|-----|-------|--------|
+| `/` | items | fuzzy filter (exact substrings rank first) |
+| `s` | items | hybrid semantic search over indexed docs (FTS5 + LanceDB; needs Ollama, degrades to a toast without it) |
+| `a` | items | archive the selected live plan or daily file (`y`/`n` confirm) |
+| `w` | items | move the selected daily file to its ISO-week archive — "weekly done" (current-week files ask twice) |
+| `esc` | items | restore the list after a search, clear the filter, or go back |
+
+Archive keys reuse the same idempotent helpers as the auto-sweep, so racing a concurrent sweep is safe; files with a live claim are skipped. Claims are auto-released when a workspace session ends gracefully; expired claims age out via TTL either way.
+
 ---
 
 ## Works with your agent
