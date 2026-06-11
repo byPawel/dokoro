@@ -8,9 +8,10 @@
  * on the items list (case-insensitive substring on label+sublabel; esc clears),
  * q quits anywhere — except while typing a filter, where q is a literal char.
  *
- * All data comes from src/cli/browse-data.ts (pure, never throws). When stdin
- * is not a TTY (raw mode unavailable), a static category summary is printed
- * instead of mounting the interactive app.
+ * All data comes from src/cli/browse-data.ts (pure, never throws). The preview
+ * renders markdown files as styled spans via src/cli/markdown-ansi.ts; other
+ * content stays plain. When stdin is not a TTY (raw mode unavailable), a
+ * static category summary is printed instead of mounting the interactive app.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -22,6 +23,7 @@ import {
   type BrowseCategory,
   type BrowseItem,
 } from './browse-data.js';
+import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 
 type Level = 'categories' | 'items' | 'preview';
 
@@ -55,6 +57,16 @@ const Footer: React.FC<{ hint: string; width: number }> = ({ hint, width }) => (
   </Box>
 );
 
+/** Item content → styled lines. Markdown files get the renderer; the rest stay plain. */
+function toMdLines(item: BrowseItem, content: string): MdLine[] {
+  if (item.kind === 'file' && item.path !== undefined && item.path.endsWith('.md')) {
+    return renderMarkdown(content);
+  }
+  return plainToLines(content);
+}
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -72,8 +84,27 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const [selectedItem, setSelectedItem] = useState<BrowseItem | null>(null);
   const [filter, setFilter] = useState('');
   const [typingFilter, setTypingFilter] = useState(false);
-  const [contentLines, setContentLines] = useState<string[]>([]);
+  const [contentLines, setContentLines] = useState<MdLine[]>([]);
   const [scroll, setScroll] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  // setSpinnerOn gets its producer (async load wiring) in a follow-up task.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [spinnerOn, setSpinnerOn] = useState(false);
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+
+  // Toast auto-clear; replaced toasts restart the timer.
+  useEffect(() => {
+    if (toast === null) return;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Spinner animation only while something is loading.
+  useEffect(() => {
+    if (!spinnerOn) return;
+    const t = setInterval(() => setSpinnerFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80);
+    return () => clearInterval(t);
+  }, [spinnerOn]);
 
   useEffect(() => {
     void listCategories(dokoroPath).then(setCategories);
@@ -110,7 +141,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const openItem = (item: BrowseItem): void => {
     void readItemContent(item).then((content) => {
       setSelectedItem(item);
-      setContentLines(content.split('\n'));
+      setContentLines(toMdLines(item, content));
       setScroll(0);
       setLevel('preview');
     });
@@ -237,7 +268,13 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     body = (
       <Box flexDirection="column">
         {visible.map((line, i) => (
-          <Text key={scroll + i} wrap="truncate-end">{line === '' ? ' ' : line}</Text>
+          <Text key={scroll + i} wrap="truncate-end">
+            {lineText(line) === '' ? ' ' : line.map((s, j) => (
+              <Text key={j} color={s.color} bold={s.bold} dimColor={s.dim} italic={s.italic}>
+                {s.text}
+              </Text>
+            ))}
+          </Text>
         ))}
       </Box>
     );
@@ -249,7 +286,10 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       <Box flexDirection="column" minHeight={viewport}>
         {body}
       </Box>
-      <Footer hint={hint} width={width} />
+      <Footer
+        hint={toast !== null ? `⚑ ${toast}` : spinnerOn ? `${SPINNER_FRAMES[spinnerFrame]} ${hint}` : hint}
+        width={width}
+      />
     </Box>
   );
 };
