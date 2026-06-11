@@ -89,6 +89,27 @@ function pruneOldClaims(sqlite: Database.Database): void {
   `).run();
 }
 
+/**
+ * Best-effort release of every open claim tagged with `sessionId`. Called from
+ * the workspace session-end path. TTL expiry remains the real safety net for
+ * crashed sessions — this only makes graceful exits clean immediately.
+ * Returns the number of claims released; never throws.
+ */
+export function releaseClaimsForSession(sessionId: string): number {
+  try {
+    const sqlite = db();
+    const info = sqlite
+      .prepare(
+        `UPDATE file_claims SET released_at = strftime('%s','now')
+         WHERE session_id = ? AND released_at IS NULL`,
+      )
+      .run(sessionId);
+    return info.changes;
+  } catch {
+    return 0;
+  }
+}
+
 interface NormalizedTarget { input: string; relPath: string; claimKey: string }
 
 /**

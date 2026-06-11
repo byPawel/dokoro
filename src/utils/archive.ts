@@ -256,6 +256,94 @@ export async function archivePlan(planId: string): Promise<ArchiveResult> {
   }
 }
 
+/** Outcome of a single user-initiated daily-file archive. */
+export type DailyArchiveOutcome =
+  | 'moved'
+  | 'alreadyArchived'
+  | 'claimed'
+  | 'currentWeek'
+  | 'missing'
+  | 'failed';
+
+/** Result of archiving a single daily file. Never thrown — always returned. */
+export interface DailyArchiveResult {
+  outcome: DailyArchiveOutcome;
+  from: string;
+  to?: string;
+  error?: string;
+}
+
+export interface DailyArchiveOptions {
+  /** Bypass the current-week and live-claim guards. Default false. */
+  force?: boolean;
+  /**
+   * Workspace root that file_claims keys are relative to. Defaults to the
+   * server process cwd (same default as `SweepOptions.claimRoot`).
+   */
+  claimRoot?: string;
+}
+
+/**
+ * Move one `daily/<name>.md` into `archive/daily/<ISO-week-of-file>/`.
+ *
+ * Shares semantics with sweepDailyFiles (claim check, week from the FILENAME
+ * date) but is user-initiated: no age threshold. Without `force` it refuses
+ * current-week files (compress_week inputs) and live-claimed files — but a
+ * FAILED claim check (unavailable DB) proceeds, since the move is already
+ * user-confirmed. Idempotent against a concurrent sweep: source-gone +
+ * destination-exists is a success. Never throws.
+ */
+export async function archiveDailyFile(
+  fileName: string,
+  opts: DailyArchiveOptions = {},
+): Promise<DailyArchiveResult> {
+  const from = path.join(DAILY_DIR, fileName);
+  try {
+    const match = fileName.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match === null) {
+      return { outcome: 'failed', from, error: 'filename has no YYYY-MM-DD prefix' };
+    }
+    const fileDate = new Date(`${match[1]}T00:00:00Z`);
+    if (Number.isNaN(fileDate.getTime())) {
+      return { outcome: 'failed', from, error: 'invalid date prefix' };
+    }
+    const to = path.join(DAILY_ARCHIVE_DIR, isoWeekDir(fileDate), fileName);
+
+    if (!(await fileExists(from))) {
+      if (await fileExists(to)) return { outcome: 'alreadyArchived', from, to };
+      return { outcome: 'missing', from };
+    }
+
+    if (opts.force !== true && isoWeekDir(fileDate) === isoWeekDir(new Date())) {
+      return { outcome: 'currentWeek', from, to };
+    }
+
+    if (opts.force !== true) {
+      try {
+        const normalized = normalizeClaimPath(from, opts.claimRoot ?? process.cwd());
+        if (normalized.ok && hasLiveClaim(claimDb(), normalized.claimKey)) {
+          return { outcome: 'claimed', from, to };
+        }
+      } catch {
+        // Claim check unavailable — proceed (manual move is user-confirmed).
+      }
+    }
+
+    try {
+      await moveFile(from, to);
+    } catch (error: unknown) {
+      // Move race with a concurrent sweep: source gone, destination present.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' && (await fileExists(to))) {
+        return { outcome: 'alreadyArchived', from, to };
+      }
+      throw error;
+    }
+    return { outcome: 'moved', from, to };
+  } catch (error: unknown) {
+    return { outcome: 'failed', from, error: errMsg(error) };
+  }
+}
+
 /** O_EXCL exclusive create (same pattern as lock-manager). False on EEXIST. */
 async function tryExclusiveCreate(payload: string): Promise<boolean> {
   try {

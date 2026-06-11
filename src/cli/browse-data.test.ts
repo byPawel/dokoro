@@ -289,6 +289,25 @@ describe('listItems: claims and presence', () => {
   });
 });
 
+describe('dirsForCategory', () => {
+  const root = '/tmp/dk';
+  it('maps file-backed categories to their watchable directories', () => {
+    expect(mod.dirsForCategory(root, 'current')).toEqual(['/tmp/dk']);
+    expect(mod.dirsForCategory(root, 'daily')).toEqual(['/tmp/dk/daily']);
+    expect(mod.dirsForCategory(root, 'weekly')).toEqual(['/tmp/dk/retrospective/weekly']);
+    expect(mod.dirsForCategory(root, 'plans')).toEqual(['/tmp/dk/.mcp/plans']);
+    expect(mod.dirsForCategory(root, 'archive')).toEqual([
+      '/tmp/dk/archive/daily',
+      '/tmp/dk/.mcp/plans/archive',
+    ]);
+    expect(mod.dirsForCategory(root, 'sweep')).toEqual(['/tmp/dk/.mcp']);
+  });
+  it('returns null for DB-backed categories (claims/agents poll instead)', () => {
+    expect(mod.dirsForCategory(root, 'claims')).toBeNull();
+    expect(mod.dirsForCategory(root, 'agents')).toBeNull();
+  });
+});
+
 describe('readItemContent', () => {
   it('renders a plan as a card with a checklist', async () => {
     await writePlan('plan-x', 'active', [

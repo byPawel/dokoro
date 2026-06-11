@@ -37,6 +37,7 @@ import { renderOutput } from '../utils/render-output.js';
 import { icon } from '../utils/icons.js';
 import { formatTimestampSlug } from '../utils/timestamp.js';
 import { sweepWorkspace } from '../utils/archive.js';
+import { releaseClaimsForSession } from './file-claim-tools.js';
 
 /**
  * Opportunistic archive sweep on workspace claim. NEVER fails the claim:
@@ -417,8 +418,8 @@ export const workspaceTools: ToolDefinition[] = [
       }
       
       const { agentId } = parseAgentFromContent(workspace.content);
-      // const sessionIdMatch = workspace.content.match(/session_id:\s*"([^"]+)"/);
-      // const _sessionId = sessionIdMatch ? sessionIdMatch[1] : 'unknown';
+      const sessionIdMatch = workspace.content.match(/session_id:\s*"([^"]+)"/);
+      const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
       
       // Flush any pending tool tracking
       await flushToolTracking();
@@ -559,6 +560,9 @@ export const workspaceTools: ToolDefinition[] = [
           await releaseLock(agentId || '');
           await disableToolTracking();
           stopHeartbeat();
+          // Best-effort claim hygiene on graceful session end; TTL expiry remains
+          // the safety net for crashed sessions.
+          if (sessionId !== null) void releaseClaimsForSession(sessionId);
           await fs.unlink(workspace.path);
         } else {
           // Just update the workspace to show it was dumped

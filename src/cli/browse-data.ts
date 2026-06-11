@@ -224,6 +224,29 @@ export async function listCategories(dokoroPath: string): Promise<BrowseCategory
   }));
 }
 
+/**
+ * Directories whose changes can invalidate a category's items — the watch
+ * targets for live refresh. Null for DB-backed categories (claims/agents),
+ * which are polled instead. Top-level dirs only: archive week/month subdirs
+ * rely on the watcher's reconcile tick.
+ */
+export function dirsForCategory(dokoroPath: string, category: BrowseCategoryId): string[] | null {
+  switch (category) {
+    case 'current': return [dokoroPath];
+    case 'daily': return [path.join(dokoroPath, 'daily')];
+    case 'weekly': return [path.join(dokoroPath, 'retrospective', 'weekly')];
+    case 'plans': return [path.join(dokoroPath, '.mcp', 'plans')];
+    case 'archive': return [
+      path.join(dokoroPath, 'archive', 'daily'),
+      path.join(dokoroPath, '.mcp', 'plans', 'archive'),
+    ];
+    case 'sweep': return [path.join(dokoroPath, '.mcp')];
+    case 'claims':
+    case 'agents':
+      return null;
+  }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Items
 // ───────────────────────────────────────────────────────────────────────────
