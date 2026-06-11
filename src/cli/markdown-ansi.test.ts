@@ -32,6 +32,11 @@ describe('renderMarkdown', () => {
     expect(li.some((s) => s.text === 'code' && s.color === 'yellow')).toBe(true);
   });
 
+  it('parses bold content containing single asterisks', () => {
+    const [line] = renderMarkdown('**O(n*m)** x');
+    expect(line.some((s) => s.text === 'O(n*m)' && s.bold === true)).toBe(true);
+  });
+
   it('colors fenced code blocks and toggles correctly', () => {
     const lines = renderMarkdown('```\nx = 1\n```\nafter');
     expect(lines[1].every((s) => s.color === 'yellow')).toBe(true);
@@ -48,6 +53,7 @@ describe('renderMarkdown', () => {
     const nasty = '**unclosed\n` `` ``` ````\n- [z] weird\n ';
     const lines: MdLine[] = renderMarkdown(nasty);
     expect(lines.map(lineText).join('\n')).toContain('**unclosed');
+    expect(lines).toHaveLength(nasty.split('\n').length);
   });
 
   it('empty string yields a single empty line', () => {

@@ -27,7 +27,8 @@ export function lineText(line: MdLine): string {
   return line.map((s) => s.text).join('');
 }
 
-const INLINE_TOKEN = /(`[^`]+`|\*\*[^*]+\*\*)/;
+// NOTE: do NOT add the `g` flag — parseInline advances by slicing `rest`; a shared lastIndex would break it.
+const INLINE_TOKEN = /(`[^`]+`|\*\*(?:(?!\*\*).)+\*\*)/;
 
 /** Inline pass: `code` → yellow, **bold** → bold. No nesting; junk stays plain. */
 function parseInline(text: string): MdSpan[] {
