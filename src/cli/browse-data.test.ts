@@ -326,6 +326,18 @@ describe('readItemContent', () => {
     expect(content).toContain('Checklist (1/2)');
   });
 
+  it('flags a long-untouched current.md as stale, fresh ones not', async () => {
+    const file = path.join(tmpDir, 'current.md');
+    await fs.writeFile(file, '# Now\n');
+    const [fresh] = await mod.listItems(tmpDir, 'current');
+    expect(fresh.sublabel).not.toContain('stale');
+
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await fs.utimes(file, old, old);
+    const [stale] = await mod.listItems(tmpDir, 'current');
+    expect(stale.sublabel).toContain('stale (session ended?)');
+  });
+
   it('returns raw markdown for file items and never throws on missing files', async () => {
     await fs.writeFile(path.join(tmpDir, 'current.md'), '# Current focus\n\n- thing\n');
     const [item] = await mod.listItems(tmpDir, 'current');

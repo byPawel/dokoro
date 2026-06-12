@@ -137,8 +137,11 @@ export const workspaceTools: ToolDefinition[] = [
       content += `- Session: ${sessionId}\n`;
       content += `- Started: ${now}\n`;
       content += `- Lock expires: ${new Date(metadata.session.lock_expires || now).toLocaleString()}\n\n`;
-      content += `## ${icon('active')} Progress\n\n`;
-      content += `- [ ] Task started\n`;
+      content += `## ${icon('active')} Progress\n`;
+      // Seed Progress with a real, timestamped event in the same format
+      // dokoro_session_log appends — the section reads as a live log from the
+      // first entry instead of a never-updated "[ ] Task started" placeholder.
+      content += `\n${icon('completed')} [${now.slice(11, 19)}] Session claimed: ${task}\n`;
       
       try {
         await fs.writeFile(workspace.path, content);

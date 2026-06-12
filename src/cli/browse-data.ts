@@ -269,14 +269,19 @@ export async function listItems(dokoroPath: string, category: BrowseCategoryId):
   }
 }
 
+/** Workspace claims lock for ~30min; untouched for longer than this means the
+ * owning session is gone and "Current" would be misleading without a flag. */
+const CURRENT_STALE_MS = 60 * 60 * 1000;
+
 async function currentItems(dokoroPath: string): Promise<BrowseItem[]> {
   const filePath = path.join(dokoroPath, 'current.md');
   try {
     const st = await fs.stat(filePath);
+    const stale = Date.now() - st.mtime.getTime() > CURRENT_STALE_MS;
     return [{
       id: 'current.md',
       label: 'current.md',
-      sublabel: `updated ${st.mtime.toISOString()}`,
+      sublabel: `updated ${st.mtime.toISOString()}${stale ? ' · stale (session ended?)' : ''}`,
       kind: 'file',
       path: filePath,
     }];
