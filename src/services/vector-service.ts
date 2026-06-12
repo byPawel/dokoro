@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { EmbeddingService, ChunkingService } from './embedding-service.js';
 import type { EmbeddingResult, Chunk } from './embedding-service.js';
+import { dokoroDataDir } from '../shared/dokoro-utils.js';
 
 // Re-export the LanceDB-free embedding/chunking surface so existing importers of
 // './vector-service.js' keep working.
@@ -77,8 +78,8 @@ export class VectorStoreService {
   private table: LanceDB.Table | null = null;
   private initialized = false;
 
-  constructor(projectPath: string) {
-    this.dbPath = path.join(projectPath, '.dokoro', 'db', 'vectors.lance');
+  constructor(dokoroPath: string) {
+    this.dbPath = path.join(dokoroDataDir(dokoroPath), 'db', 'vectors.lance');
   }
 
   /**
@@ -171,11 +172,11 @@ export class IndexingService {
   private vectorStore: VectorStoreService;
   private sqliteDb: Database.Database;
 
-  constructor(sqliteDb: Database.Database, projectPath: string) {
+  constructor(sqliteDb: Database.Database, dokoroPath: string) {
     this.sqliteDb = sqliteDb;
     this.embeddingService = new EmbeddingService();
     this.chunkingService = new ChunkingService();
-    this.vectorStore = new VectorStoreService(projectPath);
+    this.vectorStore = new VectorStoreService(dokoroPath);
   }
 
   private hashContent(content: string): string {
@@ -507,8 +508,9 @@ export class HybridSearchService {
 // FACTORY
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function createVectorServices(sqliteDb: Database.Database, projectPath: string) {
-  const indexingService = new IndexingService(sqliteDb, projectPath);
+/** `dokoroPath` is the workspace folder; vectors live at `<dokoroPath>/.dokoro/db/vectors.lance`. */
+export function createVectorServices(sqliteDb: Database.Database, dokoroPath: string) {
+  const indexingService = new IndexingService(sqliteDb, dokoroPath);
   const searchService = new HybridSearchService(sqliteDb, indexingService);
 
   return {

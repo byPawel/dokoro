@@ -27,13 +27,16 @@ export function resetSemanticCooldown(): void {
 }
 
 export async function semanticSearchItems(
-  projectPath: string,
+  dokoroPath: string,
   query: string,
   limit = 15,
 ): Promise<SemanticOutcome> {
   if (Date.now() < cooldownUntil) {
     return { ok: false, items: [], note: 'semantic search cooling down after a failure — using fuzzy only' };
   }
+  // Doc filepaths are stored relative to the project root (parent of the
+  // dokoro folder); the db/vectors live inside the dokoro folder itself.
+  const projectPath = path.dirname(dokoroPath);
   // The race's timer must not hold the event loop open after a fast search.
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -42,8 +45,11 @@ export async function semanticSearchItems(
       import('../db/index.js'),
     ]);
     const injected = (globalThis as Record<string, unknown>).__TEST_DB__;
-    const sqlite = (injected ?? getSqliteDb({ projectPath })) as Parameters<typeof createVectorServices>[0];
-    const { searchService } = createVectorServices(sqlite, projectPath);
+    const sqlite = (injected ?? getSqliteDb({
+      projectPath,
+      dokoroFolder: path.basename(dokoroPath),
+    })) as Parameters<typeof createVectorServices>[0];
+    const { searchService } = createVectorServices(sqlite, dokoroPath);
 
     const results = await Promise.race([
       searchService.search(query, limit),

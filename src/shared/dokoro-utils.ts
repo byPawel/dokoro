@@ -17,6 +17,14 @@ export const DOKORO_PATH = process.env.DOKORO_PATH || (() => {
   return withDokoro;
 })();
 
+/**
+ * Canonical per-workspace data dir: `<dokoroPath>/.dokoro` — ALL runtime data
+ * (SQLite db, vectors.lance, backups, config.json) derivations go through here.
+ */
+export function dokoroDataDir(dokoroPath: string = DOKORO_PATH): string {
+  return path.join(dokoroPath, '.dokoro');
+}
+
 // Shared date formatting functions
 export function formatDate(date: Date = new Date()): string {
   const year = date.getFullYear();

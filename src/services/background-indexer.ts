@@ -83,13 +83,13 @@ function runEntityExtraction(sqliteDb: Database.Database): void {
   console.error(`[EntityExtraction] Done: ${extracted} extracted, ${skipped} unchanged, ${totalEntities} entities`);
 }
 
-export function startBackgroundIndexer(sqliteDb: Database.Database, projectPath: string): void {
+export function startBackgroundIndexer(sqliteDb: Database.Database, dokoroPath: string): void {
   setTimeout(async () => {
     try {
       // Entity extraction runs first — no Ollama dependency
       runEntityExtraction(sqliteDb);
 
-      const { indexingService, embeddingService } = createVectorServices(sqliteDb, projectPath);
+      const { indexingService, embeddingService } = createVectorServices(sqliteDb, dokoroPath);
 
       // Health check Ollama
       const healthy = await embeddingService.healthCheck();

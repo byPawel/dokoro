@@ -164,8 +164,8 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   // toast (the breaker in semantic-search.ts handles repeated ones).
   const runSemanticSearch = async (query: string): Promise<void> => {
     setSpinnerOn(true);
-    // projectPath convention mirrors browse-data's tryDb: parent of the dokoro folder.
-    const outcome = await semanticSearchItems(path.dirname(dokoroPath), query);
+    // Same dokoro folder as browse-data's tryDb — one canonical data dir.
+    const outcome = await semanticSearchItems(dokoroPath, query);
     setSpinnerOn(false);
     setToast(outcome.note);
     if (!outcome.ok) return;

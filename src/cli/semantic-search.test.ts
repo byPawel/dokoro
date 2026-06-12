@@ -23,7 +23,7 @@ describe('semanticSearchItems', () => {
     const { semanticSearchItems, resetSemanticCooldown } = await import('./semantic-search.js');
     resetSemanticCooldown();
 
-    const out = await semanticSearchItems('/proj', 'query');
+    const out = await semanticSearchItems('/proj/dokoro', 'query');
     expect(out.ok).toBe(true);
     expect(out.items).toHaveLength(1);
     expect(out.items[0]).toMatchObject({
@@ -44,11 +44,11 @@ describe('semanticSearchItems', () => {
     const { semanticSearchItems, resetSemanticCooldown } = await import('./semantic-search.js');
     resetSemanticCooldown();
 
-    const first = await semanticSearchItems('/proj', 'q');
+    const first = await semanticSearchItems('/proj/dokoro', 'q');
     expect(first.ok).toBe(false);
     expect(first.note).toContain('ollama down');
 
-    const second = await semanticSearchItems('/proj', 'q');
+    const second = await semanticSearchItems('/proj/dokoro', 'q');
     expect(second.ok).toBe(false);
     expect(second.note).toContain('cooling down');
   });
@@ -68,13 +68,13 @@ describe('semanticSearchItems', () => {
     // the timeout failure is still in the future for the immediate second call.
     jest.useFakeTimers();
     try {
-      const pending = semanticSearchItems('/proj', 'q');
+      const pending = semanticSearchItems('/proj/dokoro', 'q');
       await jest.advanceTimersByTimeAsync(5001);
       const first = await pending;
       expect(first.ok).toBe(false);
       expect(first.note).toContain('timed out');
 
-      const second = await semanticSearchItems('/proj', 'q');
+      const second = await semanticSearchItems('/proj/dokoro', 'q');
       expect(second.ok).toBe(false);
       expect(second.note).toContain('cooling down');
     } finally {
