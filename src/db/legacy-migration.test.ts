@@ -92,6 +92,28 @@ describe('migrateLegacyDataDir', () => {
     expect(fs.existsSync(legacyDb())).toBe(false);
   });
 
+  it('moves sidecars from legacy when canonical exists but is empty (moveDirContents path)', () => {
+    makeMarkerDb(legacyDb(), 'sidecar-test');
+    // Empty sidecars are valid for SQLite (a garbage -wal would make the
+    // marker db unreadable after the move); presence is what we pin here.
+    fs.writeFileSync(`${legacyDb()}-wal`, '');
+    fs.writeFileSync(`${legacyDb()}-shm`, '');
+    // Canonical dir already exists with a freshly-created empty db, so the
+    // migration must take the replace/merge branch, not the whole-dir rename.
+    fs.mkdirSync(path.join(canonicalDir(), 'db'), { recursive: true });
+    const empty = new Database(canonicalDb());
+    empty.close();
+
+    migrateLegacyDataDir(projectPath, dokoroPath);
+
+    expect(readMarker(canonicalDb())).toBe('sidecar-test');
+    expect(fs.existsSync(`${canonicalDb()}-wal`)).toBe(true);
+    expect(fs.existsSync(`${canonicalDb()}-shm`)).toBe(true);
+    expect(fs.existsSync(legacyDb())).toBe(false);
+    expect(fs.existsSync(`${legacyDb()}-wal`)).toBe(false);
+    expect(fs.existsSync(`${legacyDb()}-shm`)).toBe(false);
+  });
+
   it('prefers canonical and leaves legacy untouched when BOTH hold data', () => {
     makeDataDb(canonicalDb());
     makeMarkerDb(legacyDb(), 'legacy-data');

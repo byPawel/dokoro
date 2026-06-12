@@ -73,7 +73,11 @@ export function isTriviallyEmptyDb(dbFile: string): boolean {
   }
 }
 
-/** Remove a trivially-empty canonical db and its WAL/SHM sidecars. */
+/**
+ * Remove a trivially-empty canonical db and its WAL/SHM sidecars. Safe because
+ * the caller has already verified the db holds no data (so any pending WAL
+ * frames are worthless too) and no connection to it is open in this process.
+ */
 function removeDbFiles(dbFile: string): void {
   for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) {
     fs.rmSync(f, { force: true });
