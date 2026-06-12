@@ -22,7 +22,7 @@ function getVectorServices() {
     const projectPath = path.dirname(DOKORO_PATH);
     const sqlite = getSqliteDb({ projectPath, dokoroFolder: path.basename(DOKORO_PATH) });
     ensureVectorTables(sqlite);
-    vectorServicesInstance = createVectorServices(sqlite, path.join(projectPath, path.basename(DOKORO_PATH)));
+    vectorServicesInstance = createVectorServices(sqlite, DOKORO_PATH);
   }
   return vectorServicesInstance;
 }

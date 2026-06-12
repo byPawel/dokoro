@@ -41,7 +41,7 @@ async function main() {
   try {
     const projectPath = path.dirname(DOKORO_PATH);
     const sqlite = getSqliteDb({ projectPath, dokoroFolder: path.basename(DOKORO_PATH) });
-    startBackgroundIndexer(sqlite, path.join(projectPath, path.basename(DOKORO_PATH)));
+    startBackgroundIndexer(sqlite, DOKORO_PATH);
   } catch (err) {
     console.error('[SearchServer] Background indexer failed to start:', err);
   }

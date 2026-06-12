@@ -17,6 +17,8 @@ import { ensureAgentFeedbackTable } from "./agent-feedback.js";
 import { ensureEntityTables } from "./entity-tables.js";
 import { dropDeadTables } from "./drop-dead-tables.js";
 import { runMigrations } from "./migrations.js";
+import { migrateLegacyDataDir } from "./legacy-migration.js";
+import { dokoroDataDir } from "../shared/dokoro-utils.js";
 
 export { ensureAgentFeedbackTable };
 export { ensureEntityTables };
@@ -110,6 +112,11 @@ export function getDb(config: DokoroDbConfig): DokoroDB {
   if (dbConnections.has(dbPath)) {
     return dbConnections.get(dbPath)!.db;
   }
+
+  // First connection for this workspace in this process: move a legacy
+  // <projectPath>/.dokoro data dir to the canonical <dokoroPath>/.dokoro
+  // location before anything is opened or created (one-way, never throws).
+  migrateLegacyDataDir(config.projectPath, getDokoroPath(config), config.dbName || "dokoro.sqlite");
 
   // Ensure directory exists
   const dbDir = path.dirname(dbPath);
@@ -223,10 +230,14 @@ export function closeAllDbs(): void {
   dbConnections.clear();
 }
 
+/** Workspace folder for a config: `<projectPath>/<dokoroFolder>`. */
+function getDokoroPath(config: DokoroDbConfig): string {
+  return path.join(config.projectPath, config.dokoroFolder || "dokoro");
+}
+
 function getDbPath(config: DokoroDbConfig): string {
-  const dokoroFolder = config.dokoroFolder || "dokoro";
   const dbName = config.dbName || "dokoro.sqlite";
-  return path.join(config.projectPath, dokoroFolder, ".dokoro", "db", dbName);
+  return path.join(dokoroDataDir(getDokoroPath(config)), "db", dbName);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

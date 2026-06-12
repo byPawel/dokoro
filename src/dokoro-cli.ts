@@ -36,6 +36,7 @@ import {
   type DokoroDbConfig,
 } from "./db/index.js";
 import { migrateDokoro } from "./db/migrate.js";
+import { dokoroDataDir } from "./shared/dokoro-utils.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -171,7 +172,7 @@ async function cmdInit(): Promise<void> {
   console.log(`  Database: .dokoro/db/dokoro.sqlite`);
 
   // Create config
-  const configPath = path.join(dokoroPath, ".dokoro", "config.json");
+  const configPath = path.join(dokoroDataDir(dokoroPath), "config.json");
   if (!fs.existsSync(configPath)) {
     fs.writeFileSync(
       configPath,

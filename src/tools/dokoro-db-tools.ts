@@ -29,6 +29,7 @@ import {
   type SearchOptions,
 } from "../db/index.js";
 import { migrateDokoro, type MigrationOptions } from "../db/migrate.js";
+import { dokoroDataDir } from "../shared/dokoro-utils.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -99,7 +100,8 @@ const dokoroInitTool: ToolDefinition = {
       }
 
       const dokoroPath = path.join(config.projectPath, config.dokoroFolder!);
-      const dbPath = path.join(dokoroPath, ".dokoro", "db");
+      const dataDir = dokoroDataDir(dokoroPath);
+      const dbPath = path.join(dataDir, "db");
 
       // Create folders
       const folders = [
@@ -109,8 +111,8 @@ const dokoroInitTool: ToolDefinition = {
         path.join(dokoroPath, "archive"),
         path.join(dokoroPath, "research"),
         path.join(dokoroPath, "decisions"),
-        path.join(dokoroPath, ".dokoro", "db"),
-        path.join(dokoroPath, ".dokoro", "backup"),
+        path.join(dataDir, "db"),
+        path.join(dataDir, "backup"),
       ];
 
       for (const folder of folders) {
@@ -123,7 +125,7 @@ const dokoroInitTool: ToolDefinition = {
       getDb(config);
 
       // Create config file
-      const configPath = path.join(dokoroPath, ".dokoro", "config.json");
+      const configPath = path.join(dataDir, "config.json");
       if (!fs.existsSync(configPath)) {
         fs.writeFileSync(
           configPath,
