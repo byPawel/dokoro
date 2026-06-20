@@ -13,6 +13,8 @@ npx jest -t "test name"        # Run tests matching a pattern
 npm run dev:core     # Run the core server in watch mode (also: dev:search, dev:planning, dev:analytics)
 ```
 
+Before merge/release, run build, lint, and test unless the user narrows scope. For type-sensitive edits, rely on `npm run build` or `tsc --noEmit` — Jest alone will not catch type errors. For bug fixes, reproduce with a targeted Jest test when practical.
+
 ## Code Style Guidelines
 
 - **TypeScript**: Strict type checking, ES modules, explicit return types
@@ -23,6 +25,15 @@ npm run dev:core     # Run the core server in watch mode (also: dev:search, dev:
 - **Formatting**: 2-space indentation, semicolons required, single quotes preferred
 - **Testing**: Co-locate tests with source files; tests inject a DB handle via `globalThis.__TEST_DB__`
 - **Comments**: JSDoc for public APIs, inline comments for complex logic
+
+## Agent Operating Rules
+
+- Implement the simplest solution to the asked problem; no speculative abstractions. Push back on overcomplicated requests.
+- Touch only lines the task requires; match existing style.
+- Never claim a build/test/release passed unless you ran it and have the output; report blockers directly.
+- Confirm active worktree/branch before editing when multiple sessions or worktrees are in play.
+- Use the GitHub noreply email for commits.
+- Split long subagent/council jobs into smaller batches; spawn agents only when they materially improve the result.
 
 ## Project Structure
 
