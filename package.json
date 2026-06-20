@@ -1,6 +1,6 @@
 {
   "name": "dokoro",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Multi-layer agent-memory MCP server (working, episodic, semantic, procedural, affective) for Claude Code and any MCP client.",
   "license": "MIT",
   "author": "Pawel Pawlowski",
