@@ -39,7 +39,7 @@
     "bin"
   ],
   "bin": {
-    "dokoro": "./bin/dokoro.js"
+    "dokoro": "bin/dokoro.js"
   },
   "scripts": {
     "dokoro": "tsx src/dokoro-cli.ts",

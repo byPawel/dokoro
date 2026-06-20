@@ -154,3 +154,7 @@ drizzle/meta/
 .mcp-current
 session-logs/
 .dokoro/
+
+# dokoro runtime workspace state (machine-generated, not source)
+dokoro/.mcp/
+dokoro/current.md
