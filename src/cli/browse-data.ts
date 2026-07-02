@@ -732,7 +732,7 @@ function entityItems(dokoroPath: string): BrowseItem[] {
          JOIN entities es ON er.source_id = es.id
          JOIN entities et ON er.target_id = et.id
          WHERE (er.source_id = ? OR er.target_id = ?) AND er.valid_to IS NULL
-         ORDER BY er.valid_from DESC`,
+         ORDER BY er.valid_from DESC, er.id DESC`,
       ).all(row.id, row.id) as EntityRelationRow[];
 
       const lines = [
