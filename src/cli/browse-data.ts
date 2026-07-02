@@ -5,7 +5,9 @@
  * folder: `current.md`, `daily/`, `retrospective/weekly/`, the archives
  * (`archive/daily/<week>/`, `.mcp/plans/archive/<YYYY-MM>/`), live plans
  * (`.mcp/plans/*.json` + `index.json`), the SQLite coordination tables
- * (`file_claims`, `agent_presence`) and `.mcp/archive-status.json`.
+ * (`file_claims`, `agent_presence`), the Working-memory question queue
+ * (`.mcp/questions.json`), the Affective feedback table (`agent_feedback`)
+ * and `.mcp/archive-status.json`.
  *
  * Every exported function is designed for direct UI consumption and NEVER
  * throws: missing dirs/files yield empty lists, unreadable content yields a
@@ -35,6 +37,8 @@ export type BrowseCategoryId =
   | 'plans'
   | 'claims'
   | 'agents'
+  | 'questions'
+  | 'feedback'
   | 'sweep';
 
 export interface BrowseCategory {
@@ -47,11 +51,11 @@ export interface BrowseItem {
   id: string;
   label: string;
   sublabel?: string;
-  kind: 'file' | 'plan' | 'claim' | 'agent';
+  kind: 'file' | 'plan' | 'claim' | 'agent' | 'question' | 'feedback';
   /** Absolute path for file/plan items. */
   path?: string;
   archived?: boolean;
-  /** Pre-rendered detail card for DB-backed items (claims / agents). */
+  /** Pre-rendered detail card for non-file items (claims/agents/questions/feedback). */
   detail?: string;
 }
 
@@ -102,6 +106,33 @@ interface ArchiveStatusJson {
   last_error?: string | null;
 }
 
+/** One entry in `.mcp/questions.json` (mirrors src/tools/question-tools.ts). */
+interface QuestionJson {
+  id: string;
+  question: string;
+  context?: string;
+  created_at: string;
+  answered_at?: string;
+  answer?: string;
+  status: 'open' | 'answered';
+  priority: 'low' | 'medium' | 'high' | 'blocker';
+}
+
+interface FeedbackRow {
+  id: number;
+  agent_id: string;
+  tool_name: string;
+  outcome: string;
+  confidence: number | null;
+  latency_ms: number | null;
+  error_message: string | null;
+  doc_id: string | null;
+  session_id: string | null;
+  metadata_json: string | null;
+  recorded_at: string;
+  age_seconds: number;
+}
+
 const CATEGORY_LABELS: Record<BrowseCategoryId, string> = {
   current: 'Current workspace',
   daily: 'Daily sessions',
@@ -110,6 +141,8 @@ const CATEGORY_LABELS: Record<BrowseCategoryId, string> = {
   plans: 'Plans',
   claims: 'File claims',
   agents: 'Agent presence',
+  questions: 'Questions',
+  feedback: 'Feedback',
   sweep: 'Archive sweep status',
 };
 
@@ -175,6 +208,18 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+/** Age of an ISO/parseable timestamp as a compact duration; 'unknown' if unparseable. */
+function ageLabel(when: string): string {
+  const ms = Date.now() - Date.parse(when);
+  return Number.isNaN(ms) ? 'unknown' : formatDuration(ms / 1000);
+}
+
+/** Single-line, whitespace-collapsed preview of `text`, ellipsised at `max`. */
+function truncate(text: string, max: number): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+}
+
 /** DB handle: test-injected handle wins, else the project database. */
 function tryDb(dokoroPath: string): Database.Database | null {
   const injected = (globalThis as Record<string, unknown>).__TEST_DB__ as Database.Database | undefined;
@@ -207,7 +252,7 @@ function presenceLabel(sqlite: Database.Database, agentId: string, now: number):
   }
 }
 
-function dbUnavailableItem(kind: 'claim' | 'agent'): BrowseItem {
+function dbUnavailableItem(kind: 'claim' | 'agent' | 'feedback'): BrowseItem {
   return { id: `${kind}s-db-unavailable`, label: '(database unavailable)', kind };
 }
 
@@ -220,15 +265,20 @@ export async function listCategories(dokoroPath: string): Promise<BrowseCategory
   const ids = Object.keys(CATEGORY_LABELS) as BrowseCategoryId[];
   return Promise.all(ids.map(async (id): Promise<BrowseCategory> => {
     const items = await listItems(dokoroPath, id);
-    return { id, label: CATEGORY_LABELS[id], count: items.length };
+    // Questions list both open and answered items, but the badge counts only
+    // the actionable (open) ones — answered rows carry `archived: true`.
+    const count = id === 'questions'
+      ? items.filter((i) => i.archived !== true).length
+      : items.length;
+    return { id, label: CATEGORY_LABELS[id], count };
   }));
 }
 
 /**
  * Directories whose changes can invalidate a category's items — the watch
- * targets for live refresh. Null for DB-backed categories (claims/agents),
- * which are polled instead. Top-level dirs only: archive week/month subdirs
- * rely on the watcher's reconcile tick.
+ * targets for live refresh. Null for DB-backed categories (claims/agents/
+ * feedback), which are polled instead. Top-level dirs only: archive
+ * week/month subdirs rely on the watcher's reconcile tick.
  */
 export function dirsForCategory(dokoroPath: string, category: BrowseCategoryId): string[] | null {
   switch (category) {
@@ -240,9 +290,12 @@ export function dirsForCategory(dokoroPath: string, category: BrowseCategoryId):
       path.join(dokoroPath, 'archive', 'daily'),
       path.join(dokoroPath, '.mcp', 'plans', 'archive'),
     ];
+    // Questions are file-backed (`.mcp/questions.json`) — watch `.mcp`.
+    case 'questions':
     case 'sweep': return [path.join(dokoroPath, '.mcp')];
     case 'claims':
     case 'agents':
+    case 'feedback':
       return null;
   }
 }
@@ -262,6 +315,8 @@ export async function listItems(dokoroPath: string, category: BrowseCategoryId):
       case 'plans': return await planItems(dokoroPath);
       case 'claims': return claimItems(dokoroPath);
       case 'agents': return agentItems(dokoroPath);
+      case 'questions': return await questionItems(dokoroPath);
+      case 'feedback': return feedbackItems(dokoroPath);
       case 'sweep': return await sweepItems(dokoroPath);
     }
   } catch {
@@ -468,6 +523,101 @@ function agentItems(dokoroPath: string): BrowseItem[] {
     });
   } catch {
     return [dbUnavailableItem('agent')];
+  }
+}
+
+/** A single question row → a BrowseItem with a pre-rendered detail card. */
+function questionItem(q: QuestionJson): BrowseItem {
+  const answered = q.status === 'answered';
+  const age = ageLabel(q.created_at);
+  const lines = [
+    'Question',
+    '────────',
+    q.question,
+    '',
+    `Status:    ${q.status}`,
+    `Priority:  ${q.priority}`,
+    `Asked:     ${q.created_at} (${age} ago)`,
+  ];
+  if (q.context !== undefined && q.context !== '') lines.push(`Context:   ${q.context}`);
+  if (answered) {
+    const answeredAge = q.answered_at !== undefined ? ` (${ageLabel(q.answered_at)} ago)` : '';
+    lines.push(`Answered:  ${q.answered_at ?? '-'}${answeredAge}`, `Answer:    ${q.answer ?? '-'}`);
+  }
+  return {
+    id: q.id,
+    label: truncate(q.question, 64),
+    sublabel: `${q.status} · ${q.priority} · asked ${age} ago`,
+    kind: 'question',
+    detail: lines.join('\n'),
+    // Answered questions are the resolved set: dim them and drop them from the
+    // open badge count (see listCategories).
+    archived: answered ? true : undefined,
+  };
+}
+
+/** Working-memory question queue from `.mcp/questions.json`: open first, then
+ * answered, each newest-first. Missing/unreadable file yields an empty list. */
+async function questionItems(dokoroPath: string): Promise<BrowseItem[]> {
+  const filePath = path.join(dokoroPath, '.mcp', 'questions.json');
+  const questions = await readJsonFile<QuestionJson[]>(filePath);
+  if (!Array.isArray(questions)) return [];
+
+  const open: Array<{ item: BrowseItem; createdMs: number }> = [];
+  const answered: Array<{ item: BrowseItem; createdMs: number }> = [];
+  for (const q of questions) {
+    // One malformed entry (hand-edited / version-skewed file) must not unwind
+    // into listItems' catch-all and hide every valid question — skip it.
+    if (typeof q?.id !== 'string' || typeof q?.question !== 'string') continue;
+    const createdMs = Date.parse(q.created_at);
+    const entry = { item: questionItem(q), createdMs: Number.isNaN(createdMs) ? 0 : createdMs };
+    (q.status === 'answered' ? answered : open).push(entry);
+  }
+  open.sort((a, b) => b.createdMs - a.createdMs);
+  answered.sort((a, b) => b.createdMs - a.createdMs);
+  return [...open.map((o) => o.item), ...answered.map((a) => a.item)];
+}
+
+/** Affective feedback rows from `agent_feedback`, newest first. Unavailable DB
+ * yields a single `(database unavailable)` placeholder. */
+function feedbackItems(dokoroPath: string): BrowseItem[] {
+  const sqlite = tryDb(dokoroPath);
+  if (sqlite === null) return [dbUnavailableItem('feedback')];
+  try {
+    const rows = sqlite.prepare(
+      `SELECT id, agent_id, tool_name, outcome, confidence, latency_ms,
+              error_message, doc_id, session_id, metadata_json, recorded_at,
+              CAST((julianday('now') - julianday(recorded_at)) * 86400 AS INTEGER) AS age_seconds
+       FROM agent_feedback
+       ORDER BY recorded_at DESC, id DESC`,
+    ).all() as FeedbackRow[];
+
+    return rows.map((row) => {
+      const age = formatDuration(row.age_seconds);
+      const lines = [
+        'Feedback',
+        '────────',
+        `Outcome:    ${row.outcome}`,
+        `Tool:       ${row.tool_name}`,
+        `Agent:      ${row.agent_id}`,
+        `Confidence: ${row.confidence ?? '-'}`,
+        `Latency:    ${row.latency_ms === null ? '-' : `${row.latency_ms}ms`}`,
+        `Recorded:   ${row.recorded_at} (${age} ago)`,
+        `Session:    ${row.session_id ?? '-'}`,
+        `Doc:        ${row.doc_id ?? '-'}`,
+      ];
+      if (row.error_message !== null) lines.push(`Error:      ${row.error_message}`);
+      if (row.metadata_json !== null) lines.push(`Metadata:   ${row.metadata_json}`);
+      return {
+        id: `feedback-${row.id}`,
+        label: `${row.outcome} · ${row.tool_name}`,
+        sublabel: `${row.agent_id} · ${age} ago`,
+        kind: 'feedback' as const,
+        detail: lines.join('\n'),
+      };
+    });
+  } catch {
+    return [dbUnavailableItem('feedback')];
   }
 }
 

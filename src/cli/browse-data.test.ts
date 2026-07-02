@@ -66,6 +66,43 @@ function insertLiveClaim(claimKey: string, agentId = 'alice', ttlSeconds = 600):
   `).run(claimKey, claimKey, agentId);
 }
 
+interface QuestionFixture {
+  id: string;
+  question: string;
+  status: 'open' | 'answered';
+  priority?: 'low' | 'medium' | 'high' | 'blocker';
+  context?: string;
+  answer?: string;
+  created_at?: string;
+  answered_at?: string;
+}
+
+async function writeQuestions(questions: QuestionFixture[]): Promise<void> {
+  await writeJson(
+    path.join(tmpDir, '.mcp', 'questions.json'),
+    questions.map((q) => ({ priority: 'medium', created_at: new Date().toISOString(), ...q })),
+  );
+}
+
+function insertFeedback(
+  toolName: string,
+  outcome: string,
+  opts: { agentId?: string; recordedAt?: string; confidence?: number; latencyMs?: number; error?: string } = {},
+): void {
+  db.prepare(`
+    INSERT INTO agent_feedback (agent_id, tool_name, outcome, confidence, latency_ms, error_message, recorded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    opts.agentId ?? 'alice',
+    toolName,
+    outcome,
+    opts.confidence ?? null,
+    opts.latencyMs ?? null,
+    opts.error ?? null,
+    opts.recordedAt ?? new Date().toISOString().slice(0, 19).replace('T', ' '),
+  );
+}
+
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dokoro-browse-test-'));
 
@@ -90,6 +127,19 @@ beforeEach(async () => {
       expires_at INTEGER NOT NULL,
       heartbeat_seq INTEGER NOT NULL DEFAULT 0,
       released_at INTEGER
+    );
+    CREATE TABLE agent_feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      confidence REAL DEFAULT 1.0,
+      latency_ms INTEGER,
+      error_message TEXT,
+      doc_id TEXT,
+      session_id TEXT,
+      metadata_json TEXT,
+      recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
   (globalThis as Record<string, unknown>).__TEST_DB__ = db;
@@ -119,6 +169,14 @@ describe('listCategories', () => {
       INSERT INTO agent_presence (agent_id, status, current_focus, last_heartbeat)
       VALUES ('alice', 'active', 'T10', strftime('%s','now'))
     `).run();
+    // Two open + one answered question: the badge counts open only.
+    await writeQuestions([
+      { id: 'q-1', question: 'open one', status: 'open' },
+      { id: 'q-2', question: 'open two', status: 'open', priority: 'blocker' },
+      { id: 'q-3', question: 'done one', status: 'answered', answer: 'yes' },
+    ]);
+    insertFeedback('dokoro_workspace_claim', 'success');
+    insertFeedback('dokoro_plan_create', 'failure');
 
     const categories = await mod.listCategories(tmpDir);
     const byId = Object.fromEntries(categories.map((c) => [c.id, c.count]));
@@ -130,14 +188,18 @@ describe('listCategories', () => {
       plans: 1,
       claims: 1,
       agents: 1,
+      questions: 2,
+      feedback: 2,
       sweep: 0,
     });
   });
 
   it('handles a completely empty/missing workspace without crashing', async () => {
     const categories = await mod.listCategories(path.join(tmpDir, 'does-not-exist'));
-    expect(categories).toHaveLength(8);
-    for (const cat of categories.filter((c) => c.id !== 'claims' && c.id !== 'agents')) {
+    expect(categories).toHaveLength(10);
+    // claims/agents/feedback read the (empty) injected DB → 0; everything else
+    // has no backing dir/file → 0. All categories are 0 in an empty workspace.
+    for (const cat of categories) {
       expect(cat.count).toBe(0);
     }
   });
@@ -289,6 +351,108 @@ describe('listItems: claims and presence', () => {
   });
 });
 
+describe('listItems: questions', () => {
+  it('lists open questions first then answered, each newest first', async () => {
+    await writeQuestions([
+      { id: 'q-open-old', question: 'older open question', status: 'open', priority: 'high', created_at: '2026-06-01T09:00:00.000Z' },
+      { id: 'q-open-new', question: 'newer open question', status: 'open', priority: 'blocker', created_at: '2026-06-10T09:00:00.000Z' },
+      { id: 'q-done', question: 'a resolved question', status: 'answered', answer: '42', created_at: '2026-06-05T09:00:00.000Z' },
+    ]);
+
+    const items = await mod.listItems(tmpDir, 'questions');
+    expect(items.map((i) => i.id)).toEqual(['q-open-new', 'q-open-old', 'q-done']);
+    expect(items.every((i) => i.kind === 'question')).toBe(true);
+
+    const [newest] = items;
+    expect(newest.label).toBe('newer open question');
+    expect(newest.sublabel).toMatch(/^open · blocker · asked .+ ago$/);
+    expect(newest.archived).toBeUndefined();
+
+    // Answered rows are flagged archived so the badge counts open only + the UI dims them.
+    const answered = items.find((i) => i.id === 'q-done');
+    expect(answered?.archived).toBe(true);
+    expect(answered?.sublabel).toContain('answered');
+  });
+
+  it('truncates a long question label but keeps the full text in the detail card', async () => {
+    const long = 'why '.repeat(40).trim();
+    await writeQuestions([
+      { id: 'q-long', question: long, status: 'answered', context: 'perf', answer: 'because', priority: 'low' },
+    ]);
+
+    const [item] = await mod.listItems(tmpDir, 'questions');
+    expect(item.label.length).toBeLessThanOrEqual(64);
+    expect(item.label.endsWith('…')).toBe(true);
+
+    const detail = await mod.readItemContent(item);
+    expect(detail).toContain('Question');
+    expect(detail).toContain(long);
+    expect(detail).toContain('Context:   perf');
+    expect(detail).toContain('Answer:    because');
+  });
+
+  it('returns an empty list when questions.json is missing or malformed', async () => {
+    expect(await mod.listItems(tmpDir, 'questions')).toEqual([]);
+    await fs.mkdir(path.join(tmpDir, '.mcp'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.mcp', 'questions.json'), 'not json');
+    expect(await mod.listItems(tmpDir, 'questions')).toEqual([]);
+  });
+
+  it('skips a field-missing entry instead of hiding the whole list', async () => {
+    await fs.mkdir(path.join(tmpDir, '.mcp'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.mcp', 'questions.json'), JSON.stringify([
+      { id: 'q-bad', status: 'open', priority: 'low', created_at: '2026-01-01T00:00:00Z' },
+      'not an object',
+      { id: 'q-ok', question: 'still here?', status: 'open', priority: 'high', created_at: '2026-06-01T00:00:00Z' },
+    ]));
+
+    const items = await mod.listItems(tmpDir, 'questions');
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('q-ok');
+
+    const cats = await mod.listCategories(tmpDir);
+    expect(cats.find((c) => c.id === 'questions')?.count).toBe(1);
+  });
+});
+
+describe('listItems: feedback', () => {
+  it('lists feedback newest first with an outcome/tool summary label', async () => {
+    insertFeedback('dokoro_plan_create', 'failure', { agentId: 'bob', recordedAt: '2026-06-01 09:00:00', error: 'boom' });
+    insertFeedback('dokoro_workspace_claim', 'success', { agentId: 'alice', recordedAt: '2026-06-10 09:00:00', confidence: 0.9, latencyMs: 123 });
+
+    const items = await mod.listItems(tmpDir, 'feedback');
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.kind === 'feedback')).toBe(true);
+
+    const [newest] = items;
+    expect(newest.label).toBe('success · dokoro_workspace_claim');
+    expect(newest.sublabel).toContain('alice');
+    expect(newest.sublabel).toMatch(/ago$/);
+
+    const detail = await mod.readItemContent(newest);
+    expect(detail).toContain('Feedback');
+    expect(detail).toContain('Outcome:    success');
+    expect(detail).toContain('Confidence: 0.9');
+    expect(detail).toContain('Latency:    123ms');
+
+    const failure = items.find((i) => i.label.startsWith('failure'));
+    expect(await mod.readItemContent(failure!)).toContain('Error:      boom');
+  });
+
+  it('returns an empty list when there is no feedback', async () => {
+    expect(await mod.listItems(tmpDir, 'feedback')).toEqual([]);
+  });
+
+  it('falls back to a "(database unavailable)" item when the DB cannot be opened', async () => {
+    delete (globalThis as Record<string, unknown>).__TEST_DB__; // mocked getSqliteDb throws
+
+    const items = await mod.listItems(tmpDir, 'feedback');
+    expect(items).toHaveLength(1);
+    expect(items[0].label).toBe('(database unavailable)');
+    expect(items[0].kind).toBe('feedback');
+  });
+});
+
 describe('dirsForCategory', () => {
   const root = '/tmp/dk';
   it('maps file-backed categories to their watchable directories', () => {
@@ -301,10 +465,13 @@ describe('dirsForCategory', () => {
       '/tmp/dk/.mcp/plans/archive',
     ]);
     expect(mod.dirsForCategory(root, 'sweep')).toEqual(['/tmp/dk/.mcp']);
+    // Questions live in `.mcp/questions.json`, so the `.mcp` dir is watched.
+    expect(mod.dirsForCategory(root, 'questions')).toEqual(['/tmp/dk/.mcp']);
   });
-  it('returns null for DB-backed categories (claims/agents poll instead)', () => {
+  it('returns null for DB-backed categories (claims/agents/feedback poll instead)', () => {
     expect(mod.dirsForCategory(root, 'claims')).toBeNull();
     expect(mod.dirsForCategory(root, 'agents')).toBeNull();
+    expect(mod.dirsForCategory(root, 'feedback')).toBeNull();
   });
 });
 

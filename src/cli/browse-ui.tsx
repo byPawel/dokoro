@@ -7,9 +7,14 @@
  * esc/backspace back (esc at the category level quits), `/` filter-as-you-type
  * on the items list (fuzzy match on label+sublabel (exact substrings rank first); esc clears),
  * q quits anywhere — except while typing a filter, where q is a literal char.
+ * In normal mode `?` opens a full-body help overlay listing the keybindings;
+ * any key closes it and returns exactly where the user was.
  * On the items list, `a` archives the selected live plan or daily file and
  * `w` archives a daily file into its weekly archive — both behind a footer
  * y/n confirm (current-week daily files need a second, force-armed confirm).
+ * `r` releases a stale advisory file claim (refused when the holder is live and
+ * the claim is unexpired — no force) and `p` advances a plan one legal step
+ * (draft→active, active→completed) — both behind the same y/n confirm.
  * `s` opens semantic search: type a query, enter runs a hybrid (FTS5+vector)
  * search via src/cli/semantic-search.ts and swaps the list for the results;
  * esc/⌫ restores the original list.
@@ -22,7 +27,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import path from 'path';
-import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
+import { render, Box, Text, useApp, useInput, useStdout, type Key } from 'ink';
 import {
   dirsForCategory,
   listCategories,
@@ -36,27 +41,33 @@ import { fuzzyFilter } from './fuzzy.js';
 import { semanticSearchItems } from './semantic-search.js';
 import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 import { archiveDailyFile, archivePlan } from '../utils/archive.js';
+import { nextPlanStatus, planTransition, readPlanStatus, releaseClaim } from './browse-actions.js';
 import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 
 type Level = 'categories' | 'items' | 'preview';
 
-/** Pending archive confirmation (footer y/n prompt). Stores the item's
- * identity — not its list index — so live reloads can't retarget it. */
-interface ConfirmState {
-  kind: 'plan' | 'daily';
-  id: string;
-  label: string;
-  fileName: string;
-  force: boolean;
-}
+/** Pending footer y/n confirmation, discriminated by the mutation it will run.
+ * Stores the item's identity — not its list index — so live reloads can't
+ * retarget it. `claim` releases a stale file claim; `plan-transition` advances
+ * a plan one legal step (from/to captured at arm time for the prompt + guard). */
+type ConfirmState =
+  | { kind: 'plan'; id: string; label: string }
+  | { kind: 'daily'; id: string; label: string; fileName: string; force: boolean }
+  | { kind: 'claim'; claimKey: string; label: string }
+  | { kind: 'plan-transition'; id: string; label: string; from: string; to: string };
 
-/** Footer prompt for a pending archive confirm. Used by BOTH the items- and
- * preview-level hints: an in-flight openItem can resolve after a confirm is
- * set, flipping the level to 'preview' while the prompt must stay visible. */
+/** Footer prompt for a pending confirm. Used by BOTH the items- and preview-
+ * level hints: an in-flight openItem can resolve after a confirm is set,
+ * flipping the level to 'preview' while the prompt must stay visible. */
 function confirmHint(c: ConfirmState): string {
-  return c.force
-    ? `⚠ "${c.label}" is CURRENT WEEK — archive anyway? y/n`
-    : `Archive "${c.label}"? y/n`;
+  switch (c.kind) {
+    case 'plan': return `Archive "${c.label}"? y/n`;
+    case 'daily': return c.force
+      ? `⚠ "${c.label}" is CURRENT WEEK — archive anyway? y/n`
+      : `Archive "${c.label}"? y/n`;
+    case 'claim': return `Release claim "${c.label}"? y/n`;
+    case 'plan-transition': return `Plan "${c.label}": ${c.from} → ${c.to}? y/n`;
+  }
 }
 
 /** Visible window of a list, centered on the selection. */
@@ -123,24 +134,51 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [pulseLines, setPulseLines] = useState<ReadonlySet<number>>(new Set());
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  // Presentational help overlay flag; any key dismisses it (see useInput).
+  const [help, setHelp] = useState(false);
   // Semantic search: snapshot of the pre-search items (null = not searching).
   const [searchSnapshot, setSearchSnapshot] = useState<BrowseItem[] | null>(null);
   const [typingSearch, setTypingSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Run a confirmed archive. A 'currentWeek' refusal escalates to a second,
-  // force-armed confirm instead of toasting. The live-refresh watcher picks
-  // up the resulting file/index changes — no manual reload here.
+  // Run a confirmed mutation (archive / claim release / plan transition). A
+  // daily 'currentWeek' refusal escalates to a second, force-armed confirm
+  // instead of toasting. The live-refresh watcher/poller picks up the resulting
+  // file/index/DB changes — no manual reload here.
   const runConfirm = async (c: ConfirmState): Promise<void> => {
     setConfirm(null);
-    // archivePlan/archiveDailyFile never throw today, but the call site
-    // discards this promise with `void` — fence regressions into a toast.
+    // The action modules never throw today, but the call site discards this
+    // promise with `void` — fence regressions into a toast.
     try {
       if (c.kind === 'plan') {
         const result = await archivePlan(c.id);
         setToast(result.ok
           ? result.alreadyArchived === true ? 'already archived' : `archived: ${c.label}`
           : `archive failed: ${result.error ?? 'unknown'}`);
+        return;
+      }
+      if (c.kind === 'claim') {
+        const result = releaseClaim(dokoroPath, c.claimKey);
+        switch (result.outcome) {
+          case 'released': setToast(`released claim: ${c.label}`); break;
+          case 'alreadyReleased': setToast('claim already released'); break;
+          case 'holderLive': setToast('holder is live — not releasing'); break;
+          case 'missing': setToast('claim is gone'); break;
+          case 'dbUnavailable': setToast('database unavailable'); break;
+          case 'failed': setToast(`release failed: ${result.error ?? 'unknown'}`); break;
+        }
+        return;
+      }
+      if (c.kind === 'plan-transition') {
+        // Re-read guarded by the status shown at arm time: a drift aborts.
+        const result = await planTransition(dokoroPath, c.id, c.from);
+        switch (result.outcome) {
+          case 'transitioned': setToast(`plan ${result.from} → ${result.to}: ${c.label}`); break;
+          case 'noTransition': setToast('no legal transition'); break;
+          case 'changed': setToast('plan changed — aborted'); break;
+          case 'missing': setToast('plan file is gone'); break;
+          case 'failed': setToast(`transition failed: ${result.error ?? 'unknown'}`); break;
+        }
         return;
       }
       const result = await archiveDailyFile(c.fileName, { force: c.force });
@@ -155,8 +193,21 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         case 'failed': setToast(`archive failed: ${result.error ?? 'unknown'}`); break;
       }
     } catch (e: unknown) {
-      setToast(`archive failed: ${e instanceof Error ? e.message : String(e)}`);
+      setToast(`action failed: ${e instanceof Error ? e.message : String(e)}`);
     }
+  };
+
+  // Arm a plan-transition confirm: read the plan's current status (fresh) so
+  // the prompt shows the exact step, and capture it as the guard the confirmed
+  // apply re-checks. No legal step from the current status → a toast, no arm.
+  const armPlanTransition = async (item: BrowseItem): Promise<void> => {
+    const status = await readPlanStatus(dokoroPath, item.id);
+    const to = nextPlanStatus(status);
+    if (to === null) {
+      setToast(status === null ? 'plan unavailable' : `no transition from ${status}`);
+      return;
+    }
+    setConfirm({ kind: 'plan-transition', id: item.id, label: item.label, from: status as string, to });
   };
 
   // Run a semantic search and swap the items list for the results. The
@@ -331,40 +382,46 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     return () => { seq++; handle.stop(); };
   }, [level, selectedItem, selectedCategory, dokoroPath]);
 
-  useInput((input, key) => {
-    // Pending archive confirm: y runs, n/esc cancels, everything else is
-    // swallowed so stray keys can't navigate or retarget the action.
-    if (confirm !== null) {
-      if (input === 'y' || input === 'Y') { void runConfirm(confirm); return; }
-      if (input === 'n' || input === 'N' || key.escape) { setConfirm(null); return; }
+  // Pending archive confirm: y runs, n/esc cancels, everything else is
+  // swallowed so stray keys can't navigate or retarget the action.
+  const handleConfirmInput = (input: string, key: Key): void => {
+    if (confirm === null) return;
+    if (input === 'y' || input === 'Y') { void runConfirm(confirm); return; }
+    if (input === 'n' || input === 'N' || key.escape) { setConfirm(null); return; }
+  };
+
+  // Help overlay: any key (esc/? included) dismisses it, leaving all other
+  // state untouched so the user lands back exactly where they were.
+  const handleHelpInput = (): void => {
+    setHelp(false);
+  };
+
+  // Search typing mode: printable chars are literal query text; enter runs.
+  const handleSearchInput = (input: string, key: Key): void => {
+    if (key.escape) { setSearchQuery(''); setTypingSearch(false); return; }
+    if (key.return) {
+      setTypingSearch(false);
+      if (searchQuery.trim() !== '') void runSemanticSearch(searchQuery.trim());
       return;
     }
+    if (key.backspace || key.delete) { setSearchQuery((q) => q.slice(0, -1)); return; }
+    if (input !== '' && !key.ctrl && !key.meta) setSearchQuery((q) => q + input);
+  };
 
-    // Search typing mode: printable chars are literal query text; enter runs.
-    if (level === 'items' && typingSearch) {
-      if (key.escape) { setSearchQuery(''); setTypingSearch(false); return; }
-      if (key.return) {
-        setTypingSearch(false);
-        if (searchQuery.trim() !== '') void runSemanticSearch(searchQuery.trim());
-        return;
-      }
-      if (key.backspace || key.delete) { setSearchQuery((q) => q.slice(0, -1)); return; }
-      if (input !== '' && !key.ctrl && !key.meta) setSearchQuery((q) => q + input);
-      return;
-    }
+  // Filter typing mode: printable chars (incl. 'q') are literal filter text.
+  const handleFilterInput = (input: string, key: Key): void => {
+    if (key.escape) { setFilter(''); setTypingFilter(false); return; }
+    if (key.return) { setTypingFilter(false); return; }
+    if (key.backspace || key.delete) { setFilter((f) => f.slice(0, -1)); return; }
+    if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
+    if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
+    if (input !== '' && !key.ctrl && !key.meta) setFilter((f) => f + input);
+  };
 
-    // Filter typing mode: printable chars (incl. 'q') are literal filter text.
-    if (level === 'items' && typingFilter) {
-      if (key.escape) { setFilter(''); setTypingFilter(false); return; }
-      if (key.return) { setTypingFilter(false); return; }
-      if (key.backspace || key.delete) { setFilter((f) => f.slice(0, -1)); return; }
-      if (key.upArrow) { setItemIndex(Math.max(0, safeItemIndex - 1)); return; }
-      if (key.downArrow) { setItemIndex(Math.max(0, Math.min(filteredItems.length - 1, safeItemIndex + 1))); return; }
-      if (input !== '' && !key.ctrl && !key.meta) setFilter((f) => f + input);
-      return;
-    }
-
+  // Normal (non-typing) mode: global q/? plus the per-level navigation.
+  const handleNormalInput = (input: string, key: Key): void => {
     if (input === 'q') { exit(); return; }
+    if (input === '?') { setHelp(true); return; }
 
     if (level === 'categories') {
       if (key.escape) { exit(); return; }
@@ -396,7 +453,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         // --path override would archive against the WRONG tree — refuse.
         if (dokoroPath !== DOKORO_PATH) { setToast('archive keys disabled for --path overrides'); return; }
         if (item.kind === 'plan' && input === 'a') {
-          setConfirm({ kind: 'plan', id: item.id, label: item.label, fileName: '', force: false });
+          setConfirm({ kind: 'plan', id: item.id, label: item.label });
           return;
         }
         if (item.kind === 'file' && item.path !== undefined && item.id.startsWith('daily/')) {
@@ -404,6 +461,23 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
           return;
         }
         setToast(input === 'a' ? 'not archivable' : 'w archives daily files only');
+        return;
+      }
+      // r/p resolve their paths from dokoroPath (browse-actions), so unlike
+      // a/w they carry NO --path-override guard.
+      if (input === 'r') {
+        if (filteredItems.length === 0) return;
+        const item = filteredItems[safeItemIndex];
+        if (item.kind !== 'claim') { setToast('r releases file claims only'); return; }
+        setConfirm({ kind: 'claim', claimKey: item.id, label: item.label });
+        return;
+      }
+      if (input === 'p') {
+        if (filteredItems.length === 0) return;
+        const item = filteredItems[safeItemIndex];
+        if (item.kind !== 'plan') { setToast('p advances plans only'); return; }
+        if (item.archived === true) { setToast('plan is archived (read-only)'); return; }
+        void armPlanTransition(item);
         return;
       }
       if (input === 's') { setTypingSearch(true); setSearchQuery(''); return; }
@@ -423,6 +497,34 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     if (key.downArrow) { setScroll((s) => Math.min(maxScroll, s + 1)); return; }
     if (key.pageUp) { setScroll((s) => Math.max(0, s - viewport)); return; }
     if (key.pageDown) setScroll((s) => Math.min(maxScroll, s + viewport));
+  };
+
+  // A confirm can arm AFTER help opened ('p'/'a' arm across an await; '?'
+  // lands mid-flight) — close help so the y/n prompt is never buried under
+  // "press any key to close help" while confirm-mode swallows keys.
+  useEffect(() => {
+    if (confirm !== null) setHelp(false);
+  }, [confirm]);
+
+  // Explicit input-mode dispatch. Precedence matters: a pending confirm
+  // swallows every key (help/typing included); help sits above the typing
+  // modes; typing modes are items-level only; everything else is normal.
+  type InputMode = 'confirm' | 'help' | 'search' | 'filter' | 'normal';
+  const inputMode: InputMode =
+    confirm !== null ? 'confirm'
+      : help ? 'help'
+        : level === 'items' && typingSearch ? 'search'
+          : level === 'items' && typingFilter ? 'filter'
+            : 'normal';
+
+  useInput((input, key) => {
+    switch (inputMode) {
+      case 'confirm': handleConfirmInput(input, key); return;
+      case 'help': handleHelpInput(); return;
+      case 'search': handleSearchInput(input, key); return;
+      case 'filter': handleFilterInput(input, key); return;
+      case 'normal': handleNormalInput(input, key); return;
+    }
   });
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -434,8 +536,28 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   let body: React.ReactElement;
   let hint: string;
 
-  if (level === 'categories') {
-    hint = '↑/↓ move · enter/→ open · q/esc quit';
+  if (help) {
+    // Full-body help replacement; the live-refresh effects keep running under
+    // it, and any key restores the view (see handleHelpInput).
+    hint = 'press any key to close help';
+    body = (
+      <Box flexDirection="column">
+        <Text color="cyan" bold>Navigation</Text>
+        <Text color="gray">  ↑/↓ move (scroll in preview) · enter/→ open · esc/⌫/← back · PgUp/PgDn page (preview) · q quit</Text>
+        <Text color="cyan" bold>Filter (items)</Text>
+        <Text color="gray">  / filter as you type · esc clears</Text>
+        <Text color="cyan" bold>Search (items)</Text>
+        <Text color="gray">  s semantic search · enter run · esc cancel / restore list</Text>
+        <Text color="cyan" bold>Archive (items)</Text>
+        <Text color="gray">  a archive live plan or daily file · w archive daily file → weekly · y/n confirm</Text>
+        <Text color="cyan" bold>Claims & plans (items)</Text>
+        <Text color="gray">  r release a stale file claim (refused if holder live) · p advance a plan (draft→active→completed) · y/n confirm</Text>
+        <Text color="cyan" bold>Help</Text>
+        <Text color="gray">  ? open this help · any key closes it</Text>
+      </Box>
+    );
+  } else if (level === 'categories') {
+    hint = '↑/↓ move · enter/→ open · ? help · q/esc quit';
     if (categories === null) {
       body = <Text color="gray">Loading…</Text>;
     } else {
@@ -463,6 +585,13 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
         ? `filter: ${filter} (esc clears) · `
         : '';
     const escHint = searchSnapshot !== null ? 'esc restore list' : 'esc/⌫/← back';
+    // Contextual action key: only the relevant category advertises r/p, so the
+    // (already long) hint line stays readable elsewhere.
+    const actionHint = selectedCategory?.id === 'claims'
+      ? ' · r release'
+      : selectedCategory?.id === 'plans'
+        ? ' · p advance'
+        : '';
     if (confirm !== null) {
       hint = confirmHint(confirm);
     } else if (typingSearch) {
@@ -470,7 +599,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     } else {
       hint = typingFilter
         ? filterHint
-        : `${filterHint}↑/↓ move · enter/→ open · / filter · s search · ${escHint} · a archive · w weekly · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+        : `${filterHint}↑/↓ move · enter/→ open · / filter · s search · ${escHint} · a archive · w weekly${actionHint} · ? help · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
     }
     if (filteredItems.length === 0) {
       body = (
@@ -504,7 +633,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
     // confirm-mode swallows all keys, so a hidden prompt would look dead.
     hint = confirm !== null
       ? confirmHint(confirm)
-      : `↑/↓ scroll · PgUp/PgDn page · esc/⌫/← back · q quit${lineInfo}`;
+      : `↑/↓ scroll · PgUp/PgDn page · esc/⌫/← back · ? help · q quit${lineInfo}`;
     const visible = contentLines.slice(scroll, scroll + viewport);
     body = (
       <Box flexDirection="column">
@@ -526,6 +655,11 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       </Box>
     );
   }
+
+  // A pending confirm outranks every branch hint: it can arm mid-await after
+  // esc dropped back to categories (force-escalation) or while help renders,
+  // and confirm-mode swallows keys — a hidden prompt would look dead.
+  if (confirm !== null) hint = confirmHint(confirm);
 
   return (
     <Box flexDirection="column">
