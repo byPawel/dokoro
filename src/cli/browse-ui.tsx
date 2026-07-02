@@ -4,8 +4,11 @@
  *   categories ──enter──▶ items ──enter──▶ content preview
  *
  * Keys: ↑/↓ move (scroll in preview), PgUp/PgDn page in preview, enter/→ open,
- * esc/backspace back (esc at the category level quits), `/` filter-as-you-type
- * on the items list (fuzzy match on label+sublabel (exact substrings rank first); esc clears),
+ * back with esc/⌫/← (esc at the category level quits), `/` filter-as-you-type
+ * on the items list (fuzzy match on label+sublabel (exact substrings rank first)).
+ * On the items list esc clears the filter before it pops out, while ⌫/← pop
+ * straight to categories KEEPING the filter, so re-entering the category
+ * restores it (per-category filter memory).
  * q quits anywhere — except while typing a filter, where q is a literal char.
  * In normal mode `?` opens a full-body help overlay listing the keybindings;
  * any key closes it and returns exactly where the user was.
@@ -497,13 +500,19 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
 
     if (level === 'items') {
       if (key.escape || key.backspace || key.delete || key.leftArrow) {
+        // Snapshot restore precedes everything for EVERY back key: any back key
+        // drops search results back to the pre-search list first.
         if (searchSnapshot !== null) {
           setItems(searchSnapshot);
           setSearchSnapshot(null);
           setItemIndex(0);
           return;
         }
-        if (filter !== '') { setFilter(''); setItemIndex(0); return; }
+        // esc clears an active filter before it will pop (a second esc pops);
+        // ⌫/← pop to categories immediately, KEEPING the filter — the
+        // per-category filter memory (categoryFiltersRef effect) then records
+        // the non-empty value and openCategory restores it on re-entry.
+        if (key.escape && filter !== '') { setFilter(''); setItemIndex(0); return; }
         setLevel('categories');
         return;
       }
@@ -624,7 +633,7 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
         <Text color={col('cyan')} bold>Navigation</Text>
         <Text color={col('gray')}>  ↑/↓ move (scroll in preview) · enter/→ open · esc/⌫/← back · PgUp/PgDn page (preview) · q quit</Text>
         <Text color={col('cyan')} bold>Filter (items)</Text>
-        <Text color={col('gray')}>  / filter as you type · esc clears</Text>
+        <Text color={col('gray')}>  / filter as you type · esc clears the filter then backs out · ⌫/← back keeping filter</Text>
         <Text color={col('cyan')} bold>Sort (items)</Text>
         <Text color={col('gray')}>  o cycle order: newest → oldest → label</Text>
         <Text color={col('cyan')} bold>Search (items)</Text>
