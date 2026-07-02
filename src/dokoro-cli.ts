@@ -546,6 +546,12 @@ async function main(): Promise<void> {
             ? path.resolve(flags.path)
             : path.join(config.projectPath, config.dokoroFolder ?? "dokoro");
         const initialCategory = typeof flags.category === "string" ? flags.category : undefined;
+        if (flags.json === true || typeof flags.json === "string") {
+          const { browseJsonDump, resolveCategoryId } = await import("./cli/browse-data.js");
+          const catId = initialCategory !== undefined ? resolveCategoryId(initialCategory) : null;
+          console.log(await browseJsonDump(dokoroPath, catId ?? undefined));
+          break;
+        }
         await runBrowse(dokoroPath, initialCategory);
         break;
       }

@@ -282,6 +282,27 @@ export async function listCategories(dokoroPath: string): Promise<BrowseCategory
 }
 
 /**
+ * Machine-readable snapshot of browse data for `dokoro browse --json`.
+ * No category: `{ dokoroPath, categories: [{id,label,count}] }`.
+ * With category: `{ dokoroPath, category, items: [{id,label,sublabel,kind,archived}] }`.
+ * Detail/content is intentionally omitted — ids let scripts fetch the files.
+ */
+export async function browseJsonDump(dokoroPath: string, categoryId?: BrowseCategoryId): Promise<string> {
+  if (categoryId === undefined) {
+    const categories = (await listCategories(dokoroPath)).map((c) => ({ id: c.id, label: c.label, count: c.count }));
+    return JSON.stringify({ dokoroPath, categories }, null, 2);
+  }
+  const items = (await listItems(dokoroPath, categoryId)).map((i) => ({
+    id: i.id,
+    label: i.label,
+    sublabel: i.sublabel,
+    kind: i.kind,
+    archived: i.archived,
+  }));
+  return JSON.stringify({ dokoroPath, category: categoryId, items }, null, 2);
+}
+
+/**
  * Directories whose changes can invalidate a category's items — the watch
  * targets for live refresh. Null for DB-backed categories (claims/agents/
  * feedback), which are polled instead. Top-level dirs only: archive

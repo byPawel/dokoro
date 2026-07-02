@@ -539,3 +539,38 @@ describe('resolveCategoryId', () => {
     expect(mod.resolveCategoryId('')).toBeNull();
   });
 });
+
+describe('browseJsonDump', () => {
+  it('dumps category counts as JSON when no category is given', async () => {
+    await fs.writeFile(path.join(tmpDir, 'current.md'), '# Now\n');
+    const parsed = JSON.parse(await mod.browseJsonDump(tmpDir)) as {
+      dokoroPath: string;
+      categories: Array<{ id: string; label: string; count: number }>;
+    };
+    expect(parsed.dokoroPath).toBe(tmpDir);
+    const current = parsed.categories.find((c) => c.id === 'current');
+    expect(current).toEqual({ id: 'current', label: 'Current workspace', count: 1 });
+  });
+
+  it('dumps a category\'s items (id/label/sublabel/kind/archived) as JSON', async () => {
+    await fs.mkdir(dailyDir(), { recursive: true });
+    await fs.writeFile(path.join(dailyDir(), '2026-06-10-10h00-wednesday-b.md'), '# b\n');
+    const parsed = JSON.parse(await mod.browseJsonDump(tmpDir, 'daily')) as {
+      dokoroPath: string;
+      category: string;
+      items: Array<{ id: string; label: string; kind: string }>;
+    };
+    expect(parsed.category).toBe('daily');
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
+      id: 'daily/2026-06-10-10h00-wednesday-b.md',
+      label: '2026-06-10-10h00-wednesday-b.md',
+      kind: 'file',
+    });
+  });
+
+  it('emits 2-space-indented JSON', async () => {
+    const out = await mod.browseJsonDump(tmpDir);
+    expect(out).toContain('\n  "dokoroPath"');
+  });
+});
