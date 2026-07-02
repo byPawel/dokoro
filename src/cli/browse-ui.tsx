@@ -557,7 +557,9 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
       </Box>
     );
   } else if (level === 'categories') {
-    hint = '↑/↓ move · enter/→ open · ? help · q/esc quit';
+    const catCount = categories?.length ?? 0;
+    const catPos = catCount === 0 ? 0 : Math.min(catIndex, catCount - 1) + 1;
+    hint = `↑/↓ move · enter/→ open · ? help · q/esc quit · ${catPos}/${catCount}`;
     if (categories === null) {
       body = <Text color="gray">Loading…</Text>;
     } else {
