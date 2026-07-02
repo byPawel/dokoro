@@ -47,7 +47,7 @@
     "dokoro:migrate": "tsx src/dokoro-cli.ts migrate",
     "dokoro:cleanup": "tsx scripts/cleanup.ts",
     "build": "npm run build:esm",
-    "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
+    "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json && mkdir -p dist/esm/db && cp src/db/schema.sql dist/esm/db/",
     "build:esm:w": "npm run build:esm -- -w",
     "prepack": "npm run build:esm",
     "lint": "eslint src/",
