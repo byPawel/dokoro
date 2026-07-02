@@ -13,6 +13,7 @@ import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { jest } from '@jest/globals';
+import type { ArchiveUndoRecord } from './browse-actions.js';
 
 jest.mock('../db/index.js', () => ({
   getSqliteDb: () => { throw new Error('getSqliteDb should not be called in tests (use __TEST_DB__)'); },
@@ -236,5 +237,72 @@ describe('planTransition / readPlanStatus / nextPlanStatus', () => {
     expect(actions.nextPlanStatus('completed')).toBeNull();
     expect(actions.nextPlanStatus('validated')).toBeNull();
     expect(actions.nextPlanStatus(null)).toBeNull();
+  });
+});
+
+describe('undoArchive', () => {
+  let tmpDir: string;
+  const plansDir = (): string => path.join(tmpDir, '.mcp', 'plans');
+
+  async function writeJson(filePath: string, value: unknown): Promise<void> {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(value, null, 2));
+  }
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dokoro-actions-undo-'));
+  });
+  afterEach(async () => { await fs.rm(tmpDir, { recursive: true, force: true }); });
+
+  describe('plan', () => {
+    it('moves the archived plan back and restores the live index entry', async () => {
+      const from = path.join(plansDir(), 'plan-x.json');
+      const to = path.join(plansDir(), 'archive', '2026-07', 'plan-x.json');
+      await writeJson(to, { title: 'Plan X', status: 'completed', items: [] });
+      await writeJson(path.join(plansDir(), 'index.json'), {
+        'plan-x': { title: 'Plan X', archived: true, archive_path: 'archive/2026-07/plan-x.json' },
+      });
+
+      const record: ArchiveUndoRecord = { kind: 'plan', from, to };
+      expect(await actions.undoArchive(record)).toBe('restored');
+
+      expect(await fs.readFile(from, 'utf-8')).toContain('Plan X');
+      await expect(fs.access(to)).rejects.toThrow();
+      const index = JSON.parse(await fs.readFile(path.join(plansDir(), 'index.json'), 'utf-8'));
+      expect(index['plan-x']).toBe('Plan X'); // bare-title live entry restored
+    });
+
+    it('returns "missing" when the archived file is gone', async () => {
+      const record: ArchiveUndoRecord = {
+        kind: 'plan',
+        from: path.join(plansDir(), 'plan-x.json'),
+        to: path.join(plansDir(), 'archive', '2026-07', 'plan-x.json'),
+      };
+      expect(await actions.undoArchive(record)).toBe('missing');
+    });
+
+    it('returns "occupied" when the original path already exists', async () => {
+      const from = path.join(plansDir(), 'plan-x.json');
+      const to = path.join(plansDir(), 'archive', '2026-07', 'plan-x.json');
+      await writeJson(to, { title: 'Plan X' });
+      await writeJson(from, { title: 'Fresh Plan X' });
+      const record: ArchiveUndoRecord = { kind: 'plan', from, to };
+      expect(await actions.undoArchive(record)).toBe('occupied');
+      // archived file untouched
+      expect(await fs.readFile(to, 'utf-8')).toContain('Plan X');
+    });
+  });
+
+  describe('daily', () => {
+    it('moves the archived daily file back to daily/', async () => {
+      const from = path.join(tmpDir, 'daily', '2026-05-12-09h00-tuesday-x.md');
+      const to = path.join(tmpDir, 'archive', 'daily', '2026-W20', '2026-05-12-09h00-tuesday-x.md');
+      await fs.mkdir(path.dirname(to), { recursive: true });
+      await fs.writeFile(to, '# x\n');
+      const record: ArchiveUndoRecord = { kind: 'daily', from, to };
+      expect(await actions.undoArchive(record)).toBe('restored');
+      expect(await fs.readFile(from, 'utf-8')).toContain('# x');
+      await expect(fs.access(to)).rejects.toThrow();
+    });
   });
 });

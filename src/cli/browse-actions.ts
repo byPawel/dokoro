@@ -33,6 +33,27 @@ function errMsg(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Move a file, creating the destination dir; EXDEV-safe copy+unlink fallback. */
+async function moveFile(src: string, dest: string): Promise<void> {
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+  try {
+    await fs.rename(src, dest);
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+    await fs.copyFile(src, dest);
+    await fs.unlink(src);
+  }
+}
+
 /** DB handle: test-injected handle wins, else the project database. Mirrors browse-data.ts's tryDb. */
 function tryDb(dokoroPath: string): Database.Database | null {
   const injected = (globalThis as Record<string, unknown>).__TEST_DB__ as Database.Database | undefined;
@@ -237,5 +258,57 @@ export async function planTransition(
     return { outcome: 'transitioned', from, to };
   } catch (error: unknown) {
     return { outcome: 'failed', error: errMsg(error) };
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Undo the most recent archive (reverse of archivePlan / archiveDailyFile)
+// ───────────────────────────────────────────────────────────────────────────
+
+/** The single most-recent archive the UI can offer to undo this session.
+ * `from` = original location, `to` = archive location (both absolute). */
+export interface ArchiveUndoRecord {
+  kind: 'plan' | 'daily';
+  from: string;
+  to: string;
+}
+
+export type UndoArchiveOutcome = 'restored' | 'missing' | 'occupied' | 'failed';
+
+/**
+ * Reverse a single archive: move `record.to` back to `record.from`, and for a
+ * plan restore its index entry from `{title, archived, archive_path}` back to
+ * the bare title string. Fresh checks: the archived file must still exist
+ * ('missing') and the original slot must be free ('occupied'). Never throws.
+ */
+export async function undoArchive(record: ArchiveUndoRecord): Promise<UndoArchiveOutcome> {
+  try {
+    if (!(await fileExists(record.to))) return 'missing';
+    if (await fileExists(record.from)) return 'occupied';
+
+    await moveFile(record.to, record.from);
+
+    if (record.kind === 'plan') {
+      const plansDir = path.dirname(record.from);
+      const planId = path.basename(record.from).replace(/\.json$/, '');
+      const indexPath = path.join(plansDir, 'index.json');
+      let index: Record<string, unknown> = {};
+      try {
+        index = JSON.parse(await fs.readFile(indexPath, 'utf-8')) as Record<string, unknown>;
+      } catch {
+        index = {};
+      }
+      const entry = index[planId];
+      const title =
+        entry !== null && typeof entry === 'object' && typeof (entry as { title?: unknown }).title === 'string'
+          ? (entry as { title: string }).title
+          : planId;
+      index[planId] = title; // reverse archivePlan's index write
+      await writeFileAtomic(indexPath, JSON.stringify(index, null, 2));
+    }
+
+    return 'restored';
+  } catch {
+    return 'failed';
   }
 }

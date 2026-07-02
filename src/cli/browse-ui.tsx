@@ -12,6 +12,7 @@
  * On the items list, `a` archives the selected live plan or daily file and
  * `w` archives a daily file into its weekly archive — both behind a footer
  * y/n confirm (current-week daily files need a second, force-armed confirm).
+ * `u` undoes the single most-recent archive from this session (same confirm).
  * `r` releases a stale advisory file claim (refused when the holder is live and
  * the claim is unexpired — no force) and `p` advances a plan one legal step
  * (draft→active, active→completed) — both behind the same y/n confirm.
@@ -43,7 +44,7 @@ import { fuzzyFilter } from './fuzzy.js';
 import { semanticSearchItems } from './semantic-search.js';
 import { colorsEnabled, lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 import { archiveDailyFile, archivePlan } from '../utils/archive.js';
-import { nextPlanStatus, planTransition, readPlanStatus, releaseClaim } from './browse-actions.js';
+import { nextPlanStatus, planTransition, readPlanStatus, releaseClaim, undoArchive, type ArchiveUndoRecord } from './browse-actions.js';
 import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 
 type Level = 'categories' | 'items' | 'preview';
@@ -52,12 +53,14 @@ type SortOrder = 'default' | 'reverse' | 'label';
 /** Pending footer y/n confirmation, discriminated by the mutation it will run.
  * Stores the item's identity — not its list index — so live reloads can't
  * retarget it. `claim` releases a stale file claim; `plan-transition` advances
- * a plan one legal step (from/to captured at arm time for the prompt + guard). */
+ * a plan one legal step (from/to captured at arm time for the prompt + guard).
+ * `undo` reverses the single most-recent archive (`record` carries the paths). */
 type ConfirmState =
   | { kind: 'plan'; id: string; label: string }
   | { kind: 'daily'; id: string; label: string; fileName: string; force: boolean }
   | { kind: 'claim'; claimKey: string; label: string }
-  | { kind: 'plan-transition'; id: string; label: string; from: string; to: string };
+  | { kind: 'plan-transition'; id: string; label: string; from: string; to: string }
+  | { kind: 'undo'; label: string; record: ArchiveUndoRecord };
 
 /** Footer prompt for a pending confirm. Used by BOTH the items- and preview-
  * level hints: an in-flight openItem can resolve after a confirm is set,
@@ -70,6 +73,7 @@ function confirmHint(c: ConfirmState): string {
       : `Archive "${c.label}"? y/n`;
     case 'claim': return `Release claim "${c.label}"? y/n`;
     case 'plan-transition': return `Plan "${c.label}": ${c.from} → ${c.to}? y/n`;
+    case 'undo': return `Undo archive of "${c.label}"? y/n`;
   }
 }
 
@@ -140,6 +144,8 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [pulseLines, setPulseLines] = useState<ReadonlySet<number>>(new Set());
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  // The single most-recent archive this session, armed for `u` undo (null = nothing).
+  const [lastArchive, setLastArchive] = useState<ArchiveUndoRecord | null>(null);
   // Presentational help overlay flag; any key dismisses it (see useInput).
   const [help, setHelp] = useState(false);
   // Semantic search: snapshot of the pre-search items (null = not searching).
@@ -153,11 +159,31 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   // file/index/DB changes — no manual reload here.
   const runConfirm = async (c: ConfirmState): Promise<void> => {
     setConfirm(null);
+    // Undo the last archive. undoArchive never throws; a success clears the
+    // single-slot record so a second `u` reports 'nothing to undo'.
+    if (c.kind === 'undo') {
+      const outcome = await undoArchive(c.record);
+      switch (outcome) {
+        case 'restored': setToast(`restored: ${c.label}`); setLastArchive(null); break;
+        case 'missing': setToast('undo: archived file is gone'); break;
+        case 'occupied': setToast('undo: original path is occupied'); break;
+        case 'failed': setToast('undo failed'); break;
+      }
+      return;
+    }
     // The action modules never throw today, but the call site discards this
     // promise with `void` — fence regressions into a toast.
     try {
       if (c.kind === 'plan') {
         const result = await archivePlan(c.id);
+        // Remember a real move (not a no-op) so `u` can reverse it this session.
+        if (result.ok && result.alreadyArchived !== true && result.archivePath !== undefined) {
+          setLastArchive({
+            kind: 'plan',
+            from: path.join(dokoroPath, '.mcp', 'plans', `${c.id}.json`),
+            to: path.join(dokoroPath, '.mcp', 'plans', result.archivePath),
+          });
+        }
         setToast(result.ok
           ? result.alreadyArchived === true ? 'already archived' : `archived: ${c.label}`
           : `archive failed: ${result.error ?? 'unknown'}`);
@@ -189,7 +215,10 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
       }
       const result = await archiveDailyFile(c.fileName, { force: c.force });
       switch (result.outcome) {
-        case 'moved': setToast(`moved to weekly archive: ${c.label}`); break;
+        case 'moved':
+          if (result.to !== undefined) setLastArchive({ kind: 'daily', from: result.from, to: result.to });
+          setToast(`moved to weekly archive: ${c.label}`);
+          break;
         case 'alreadyArchived': setToast('already archived'); break;
         case 'claimed': setToast('skipped: file has a live claim'); break;
         case 'currentWeek':
@@ -504,6 +533,15 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
         setToast(input === 'a' ? 'not archivable' : 'w archives daily files only');
         return;
       }
+      if (input === 'u') {
+        if (lastArchive === null) { setToast('nothing to undo'); return; }
+        // archive.ts (and thus the captured undo paths) target the module
+        // DOKORO_PATH; an override can only ever leave lastArchive null, but
+        // guard the message explicitly to mirror a/w.
+        if (dokoroPath !== DOKORO_PATH) { setToast('undo disabled for --path overrides'); return; }
+        setConfirm({ kind: 'undo', label: path.basename(lastArchive.from), record: lastArchive });
+        return;
+      }
       // r/p resolve their paths from dokoroPath (browse-actions), so unlike
       // a/w they carry NO --path-override guard.
       if (input === 'r') {
@@ -593,6 +631,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
         <Text color={col('gray')}>  s semantic search · enter run · esc cancel / restore list</Text>
         <Text color={col('cyan')} bold>Archive (items)</Text>
         <Text color={col('gray')}>  a archive live plan or daily file · w archive daily file → weekly · y/n confirm</Text>
+        <Text color={col('gray')}>  u undo the last archive · y/n confirm</Text>
         <Text color={col('cyan')} bold>Claims & plans (items)</Text>
         <Text color={col('gray')}>  r release a stale file claim (refused if holder live) · p advance a plan (draft→active→completed) · y/n confirm</Text>
         <Text color={col('cyan')} bold>Help</Text>
