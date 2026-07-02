@@ -373,6 +373,27 @@ section{padding:104px 0;position:relative}
 .cmp .partial{color:var(--procedural);text-align:center;font-family:"JetBrains Mono";font-size:13px}
 
 /* ============================================================
+   BROWSE TERMINAL MOCK + ROADMAP EFFORT BARS
+   ============================================================ */
+.term-sel{color:var(--storage);font-weight:700}
+.term-live{color:var(--working)}
+.term-stale{color:var(--procedural)}
+.term-hint{color:var(--faint)}
+.term-hint b{color:var(--text-soft);font-weight:700}
+.term-toast{color:var(--accent)}
+
+.rd-chart{display:flex;flex-direction:column;gap:13px;position:relative;z-index:2;margin-top:18px}
+.rd-row{display:grid;grid-template-columns:minmax(150px,218px) 1fr 108px;gap:14px;align-items:center}
+.rd-name{font-family:"JetBrains Mono";font-size:12px;color:var(--text-soft);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-name b{color:var(--text);font-weight:700}
+.rd-track{position:relative;height:18px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.rd-fill{position:absolute;top:0;bottom:0;left:0;width:0;border-radius:0 4px 4px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 45%,transparent),var(--accent));transition:width 1.1s var(--ease)}
+.rd-row.spike .rd-fill{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--storage) 80%,transparent) 0 6px,color-mix(in srgb,var(--storage) 25%,transparent) 6px 12px)}
+.rd-val{font-family:"JetBrains Mono";font-size:11px;color:var(--muted);white-space:nowrap}
+.rd-val b{color:var(--text)}
+@media(max-width:620px){.rd-row{grid-template-columns:110px 1fr 84px}.rd-name{font-size:10.5px}}
+
+/* ============================================================
    PRINCIPLES
    ============================================================ */
 .prin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:13px}
@@ -421,6 +442,7 @@ footer .meta b{color:var(--text);font-weight:700}
     <a href="#affective">Affective</a>
     <a href="#temporal">Temporal</a>
     <a href="#storage">Storage</a>
+    <a href="#browse">Browse</a>
     <a href="#tools">Catalogue</a>
     <a class="pill" href="https://github.com/byPawel/dokoro">GitHub ↗</a>
     <a class="pill" href="https://tachibot.com">TachiBot →</a>
@@ -715,11 +737,88 @@ npm install --omit=optional</pre>
   </div>
 </section>
 
+<!-- ============ BROWSE DASHBOARD ============ -->
+<section id="browse">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 08 — The Dashboard</div>
+      <h2>Supervise agents <span class="accent">live</span></h2>
+      <p><span class="kbd">npx dokoro browse</span> is a terminal dashboard over the whole memory folder — <b>ten categories</b>, from the live workspace and plans to file claims, agent presence, open <b>questions</b> and the affective <b>feedback</b> ledger. File watchers and pollers keep every list live, changed preview lines flash, <code>/</code> fuzzy-filters, <code>s</code> runs hybrid FTS5+vector search, and <code>?</code> overlays every keybinding.</p>
+    </div>
+    <div class="split reveal" style="margin-bottom:22px">
+      <div class="ledger">
+        <div class="lhead"><span class="d" style="background:var(--storage)"></span> dokoro browse · file claims — live</div>
+<pre>dokoro <span class="c">›</span> File claims
+<span class="c">──────────────────────────────────────────</span>
+<span class="term-sel">▸ src/auth/session.ts</span>    <span class="term-live">alice · live · 4m left</span>
+  src/cli/browse-ui.tsx  <span class="term-stale">bob · stale · expired</span>
+<span class="c">──────────────────────────────────────────</span>
+<span class="term-hint">↑/↓ move · enter open · <b>r</b> release · <b>?</b> help · 1/2</span>
+<span class="term-toast">⚑ holder is live — not releasing</span></pre>
+      </div>
+      <div class="annot">
+        <div class="acard" style="border-left-color:var(--storage)">
+          <h4>Observe-first <span class="tag" style="color:var(--storage);border-color:var(--storage)">council-ruled</span></h4>
+          <p>Read everywhere, write only where gated. A multi-model council rejected command palettes, multi-select and inline editing — a coordination dashboard must <b>never race the agents it watches</b>.</p>
+        </div>
+        <div class="acard" style="border-left-color:var(--working)">
+          <h4>Liveness gate <span class="tag" style="color:var(--working);border-color:var(--working)">r · claims</span></h4>
+          <p><code>r</code> releases a stuck file claim only when the holder's heartbeat is <b>stale past the 900s TTL</b> or the lease expired. A live holder is refused — no force flag exists.</p>
+        </div>
+        <div class="acard" style="border-left-color:var(--procedural)">
+          <h4>Fresh-read, drift abort <span class="tag" style="color:var(--procedural);border-color:var(--procedural)">p · plans</span></h4>
+          <p><code>p</code> advances a plan one legal step (draft→active→completed). The plan is <b>re-read before writing</b>; if its status drifted since you confirmed, the write aborts.</p>
+        </div>
+      </div>
+    </div>
+    <div class="plate reveal" id="dia-gate">
+      <div class="dia-top">
+        <div class="dia-title">GATED MUTATION · <b>key</b> → confirm → fresh read → gate → <b>write / refuse</b></div>
+        <button class="play"><span class="tri"></span> Replay</button>
+      </div>
+      <div class="stage-flag"><span class="step">—</span><span class="cap">Press replay to trace an action through the gates</span></div>
+      <div class="flow-stage" style="height:290px"></div>
+      <div class="legend">
+        <span><i style="background:var(--working)"></i> write lands, race-guarded in SQL</span>
+        <span><i style="background:var(--affective)"></i> refused with a toast — <b>no force path</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section id="roadmap">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-code">§ 09 — The Road Ahead</div>
+      <h2>Verified <span class="accent">next steps</span></h2>
+      <p>Planned by a multi-model council, then <b>adversarially verified</b> by two independent reviewers against the shipped code — a ~26-day wishlist collapsed to under a week, and one whole proposal was refuted as already built. Scope is ruled, not implied: <b>strictly per-project</b>, no registry, no cross-project surfaces; ephemeral sandboxes get explicit paths.</p>
+    </div>
+    <div class="plate reveal">
+      <div class="dia-top">
+        <div class="dia-title">EFFORT · <b>verified estimates</b> · days of work</div>
+      </div>
+      <div class="rd-chart" id="rdChart">
+        <div class="rd-row"><span class="rd-name"><b>env identity</b> resolver</span><span class="rd-track"><span class="rd-fill" data-w="17"></span></span><span class="rd-val"><b>0.5d</b> · headless id</span></div>
+        <div class="rd-row"><span class="rd-name"><b>model provenance</b> filter</span><span class="rd-track"><span class="rd-fill" data-w="17"></span></span><span class="rd-val"><b>0.5d</b> · zero schema</span></div>
+        <div class="rd-row"><span class="rd-name"><b>presence capabilities</b></span><span class="rd-track"><span class="rd-fill" data-w="17"></span></span><span class="rd-val"><b>0.5d</b> · data only</span></div>
+        <div class="rd-row"><span class="rd-name"><b>dokoro doctor</b> preflight</span><span class="rd-track"><span class="rd-fill" data-w="33"></span></span><span class="rd-val"><b>1d</b> · fail fast</span></div>
+        <div class="rd-row"><span class="rd-name"><b>handoff</b> lifecycle</span><span class="rd-track"><span class="rd-fill" data-w="33"></span></span><span class="rd-val"><b>1d</b> · complete/fail</span></div>
+        <div class="rd-row spike"><span class="rd-name"><b>dialectic NL query</b></span><span class="rd-track"><span class="rd-fill" data-w="100"></span></span><span class="rd-val"><b>3d</b> spike · gated</span></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i> committed build</span>
+        <span><i style="background:repeating-linear-gradient(135deg,var(--storage) 0 4px,transparent 4px 8px)"></i> <b>the wedge</b> — quality spike gates the full build</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ CATALOGUE ============ -->
 <section id="tools">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="sec-code">§ 08 — The Catalogue</div>
+      <div class="sec-code">§ 10 — The Catalogue</div>
       <h2>Every tool, <span class="accent">by layer</span></h2>
       <p>Filter the toolset by the memory layer it reads or writes. Core tools ship on <code>core-server.js</code>; analytics and bridge tools register on their own servers.</p>
     </div>
@@ -738,7 +837,7 @@ npm install --omit=optional</pre>
 <section id="compare">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="sec-code">§ 09 — The Survey</div>
+      <div class="sec-code">§ 11 — The Survey</div>
       <h2>How it <span class="accent">compares</span></h2>
       <p>Four capabilities set dokoro apart — bi-temporal facts, per-agent affective feedback, workspace lock coordination, and WAL concurrency — all queryable as plain MCP tool calls or visible directly in the SQLite schema.</p>
     </div>
@@ -764,7 +863,7 @@ npm install --omit=optional</pre>
 <section id="arch">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="sec-code">§ 10 — Under the Hood</div>
+      <div class="sec-code">§ 12 — Under the Hood</div>
       <h2>How it <span class="accent">holds together</span></h2>
       <p>Layer-driven, gracefully degrading, and built on the MCP TypeScript SDK.</p>
     </div>
@@ -776,7 +875,8 @@ npm install --omit=optional</pre>
       <div class="prin reveal"><div class="pi">v · DEGRADE</div><h3>Runs <em>without</em> Ollama</h3><p>No local LLM? Regex extraction takes over and recall falls back to recency. Nothing hard-fails.</p></div>
       <div class="prin reveal"><div class="pi">vi · BRIDGE</div><h3>Zero cost when off</h3><p>Three opt-in tools wire tachibot's multi-model output into memory. Disabled by default.</p></div>
       <div class="prin reveal"><div class="pi">vii · CLAIMS</div><h3>Multi-agent <em>file claims</em></h3><p>Advisory per-file leases (<code>dokoro_file_claim</code>, default 300s) so agents sharing a worktree see who is editing what. Conflicts warn — they never block — and expired or dead-holder claims are taken over.</p></div>
-      <div class="prin reveal"><div class="pi">viii · BROWSE</div><h3><em>dokoro browse</em></h3><p>An interactive terminal browser over the whole memory folder — sessions, plans, archive, file claims, agent presence — with <code>/</code> filter-as-you-type and scrolling previews. Falls back to a static summary when not a TTY.</p></div>
+      <div class="prin reveal"><div class="pi">viii · BROWSE</div><h3><em>dokoro browse</em></h3><p>A live terminal dashboard over all ten memory categories — questions and feedback included — with <code>?</code> help, fuzzy filter, hybrid search, and gated actions: release a stale claim, advance a plan. Falls back to a static summary when not a TTY.</p></div>
+      <div class="prin reveal"><div class="pi">ix · SCOPE</div><h3>Strictly <em>per-project</em></h3><p>Isolation is a ruled invariant, not a default: one memory per project, cross-project writes forbidden, no registry, no <code>--all</code>. Sandboxes and CI get an explicit path — memory never leaks between repos.</p></div>
     </div>
   </div>
 </section>
@@ -790,7 +890,7 @@ npm install --omit=optional</pre>
         <p>The agent never holds it all in context — it pulls the slice it needs from the layer that owns it, then writes back what it learned. The server stores and serves; the agent reads and writes.</p>
       </div>
       <div class="meta">
-        <b>PACKAGE</b><br>dokoro · v0.1.0<br><br>
+        <b>PACKAGE</b><br>dokoro · v0.3.0<br><br>
         <b>BUILT ON</b><br>MCP TypeScript SDK<br><br>
         <b>LICENSE</b><br>MIT
       </div>
@@ -941,7 +1041,16 @@ class FlowDiagram{
     this.position();window.addEventListener("resize",()=>this.position());
   }
   center(id){const r=this.nodeEls[id].getBoundingClientRect();const s=this.stageEl.getBoundingClientRect();return {x:r.left+r.width/2-s.left,y:r.top+r.height/2-s.top};}
-  position(){this.edges.forEach(e=>{const a=this.center(e.from),b=this.center(e.to);const l=this.lines[e.from+">"+e.to];l.setAttribute("x1",a.x);l.setAttribute("y1",a.y);l.setAttribute("x2",b.x);l.setAttribute("y2",b.y);});}
+  rect(id){const r=this.nodeEls[id].getBoundingClientRect();const s=this.stageEl.getBoundingClientRect();return {x:r.left+r.width/2-s.left,y:r.top+r.height/2-s.top,hw:r.width/2,hh:r.height/2};}
+  // Trim each edge to the node borders (+gap) so lines never slide under a
+  // box or clip its glow — entry/exit points land ON the border.
+  position(){this.edges.forEach(e=>{const A=this.rect(e.from),B=this.rect(e.to);
+    const dx=B.x-A.x,dy=B.y-A.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len,GAP=6;
+    const trim=r=>Math.min(ux!==0?r.hw/Math.abs(ux):Infinity,uy!==0?r.hh/Math.abs(uy):Infinity);
+    const t1=Math.min(trim(A)+GAP,len/2),t2=Math.min(trim(B)+GAP,len/2);
+    const l=this.lines[e.from+">"+e.to];
+    l.setAttribute("x1",A.x+ux*t1);l.setAttribute("y1",A.y+uy*t1);
+    l.setAttribute("x2",B.x-ux*t2);l.setAttribute("y2",B.y-uy*t2);});}
   reset(){this.timers.forEach(clearTimeout);this.timers=[];this.stageEl.querySelectorAll(".pulse").forEach(p=>p.remove());Object.values(this.nodeEls).forEach(n=>{n.classList.remove("active");n.classList.add("dim");});Object.values(this.lines).forEach(l=>l.classList.remove("live"));}
   pulse(from,to,dur,delay){return new Promise(res=>{const t=setTimeout(()=>{const a=this.center(from),b=this.center(to);const dot=document.createElement("div");dot.className="pulse";this.stageEl.appendChild(dot);const start=performance.now();const step=now=>{const k=Math.min(1,(now-start)/dur);const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;dot.style.left=(a.x+(b.x-a.x)*e)+"px";dot.style.top=(a.y+(b.y-a.y)*e)+"px";if(k<1)requestAnimationFrame(step);else{dot.remove();res();}};requestAnimationFrame(step);},delay);this.timers.push(t);});}
   play(){if(!this.flag)return;this.position();this.reset();let delay=300;
@@ -1004,9 +1113,37 @@ const bridgeCfg={
   ]
 };
 
+const gateCfg={
+  nodes:[
+    {id:"key",  x:8, y:50, label:"KEY", sub:"r · p · a · w", kind:"io", color:"var(--accent)"},
+    {id:"conf", x:27,y:50, label:"CONFIRM", sub:"y/n footer prompt", color:"var(--storage)"},
+    {id:"fresh",x:47,y:50, label:"FRESH READ", sub:"row / plan re-read", color:"var(--episodic)"},
+    {id:"gate", x:66,y:50, label:"GATE", sub:"liveness · drift", color:"var(--procedural)"},
+    {id:"write",x:87,y:18, label:"WRITE", sub:"release · advance", color:"var(--working)"},
+    {id:"refuse",x:87,y:82, label:"REFUSE", sub:"toast · no write", color:"var(--affective)"}
+  ],
+  edges:[{from:"key",to:"conf"},{from:"conf",to:"fresh"},{from:"fresh",to:"gate"},{from:"gate",to:"write"},{from:"gate",to:"refuse"}],
+  stages:[
+    {cap:"A single key arms the action on the selected item — identity captured, never list index",nodes:["key"],edges:[],dur:1150},
+    {cap:"Nothing mutates without a visible y/n confirm — it outranks every other keypress",nodes:["conf"],edges:[["key","conf"]],dur:1150},
+    {cap:"On y, the row is re-read fresh — the state you confirmed is re-checked, not trusted",nodes:["fresh"],edges:[["conf","fresh"]],dur:1150},
+    {cap:"The gate asks: holder heartbeat within the 900s TTL? plan status drifted?",nodes:["gate"],edges:[["fresh","gate"]],dur:1150},
+    {cap:"Stale holder, unchanged plan → the write lands, race-guarded in SQL",nodes:["write"],edges:[["gate","write"]],dur:1150},
+    {cap:"Live holder, drifted plan → refused with a toast — no force flag exists",nodes:["refuse"],edges:[["gate","refuse"]],dur:1150,done:"The dashboard can never race a live agent."}
+  ]
+};
+
 const diagrams=[];
 function initDia(id,cfg){const root=document.getElementById(id);if(root)diagrams.push({root,fd:new FlowDiagram(root,cfg)});}
-initDia("dia-loop",loopCfg);initDia("dia-affective",affectiveCfg);initDia("dia-bridge",bridgeCfg);
+initDia("dia-loop",loopCfg);initDia("dia-affective",affectiveCfg);initDia("dia-bridge",bridgeCfg);initDia("dia-gate",gateCfg);
+
+/* ---- ROADMAP effort bars: animate widths on first view ---- */
+(function(){
+  const chart=document.getElementById("rdChart");if(!chart)return;
+  const fills=chart.querySelectorAll(".rd-fill");
+  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(!e.isIntersecting)return;fills.forEach(f=>{f.style.width=f.dataset.w+"%";});obs.disconnect();});},{threshold:.35});
+  obs.observe(chart);
+})();
 
 /* ---- TEMPORAL slider ---- */
 (function(){
