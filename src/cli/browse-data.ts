@@ -352,6 +352,14 @@ export async function listItems(dokoroPath: string, category: BrowseCategoryId):
   }
 }
 
+/** Reorder items for the UI sort toggle. `default` keeps the source order
+ * (already newest-first for date categories); never mutates the input. */
+export function sortItems(items: BrowseItem[], order: 'default' | 'reverse' | 'label'): BrowseItem[] {
+  if (order === 'reverse') return [...items].reverse();
+  if (order === 'label') return [...items].sort((a, b) => a.label.localeCompare(b.label));
+  return items;
+}
+
 /** Workspace claims lock for ~30min; untouched for longer than this means the
  * owning session is gone and "Current" would be misleading without a flag. */
 const CURRENT_STALE_MS = 60 * 60 * 1000;

@@ -34,6 +34,7 @@ import {
   listItems,
   readItemContent,
   resolveCategoryId,
+  sortItems,
   type BrowseCategory,
   type BrowseItem,
 } from './browse-data.js';
@@ -46,6 +47,7 @@ import { nextPlanStatus, planTransition, readPlanStatus, releaseClaim } from './
 import { DOKORO_PATH } from '../shared/dokoro-utils.js';
 
 type Level = 'categories' | 'items' | 'preview';
+type SortOrder = 'default' | 'reverse' | 'label';
 
 /** Pending footer y/n confirmation, discriminated by the mutation it will run.
  * Stores the item's identity — not its list index — so live reloads can't
@@ -130,6 +132,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   const [selectedItem, setSelectedItem] = useState<BrowseItem | null>(null);
   const [filter, setFilter] = useState('');
   const [typingFilter, setTypingFilter] = useState(false);
+  const [order, setOrder] = useState<SortOrder>('default');
   const [contentLines, setContentLines] = useState<MdLine[]>([]);
   const [scroll, setScroll] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
@@ -235,8 +238,12 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  const orderRef = useRef(order);
+  orderRef.current = order;
   // Remembers each category's last filter so returning to it restores that filter.
   const categoryFiltersRef = useRef<Map<BrowseCategory['id'], string>>(new Map());
+  // Remembers each category's last sort order so returning to it restores that order.
+  const categoryOrdersRef = useRef<Map<BrowseCategory['id'], SortOrder>>(new Map());
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const searchSnapshotRef = useRef(searchSnapshot);
@@ -274,9 +281,10 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     });
   }, [dokoroPath]);
 
+  const orderedItems = useMemo(() => sortItems(items, order), [items, order]);
   const filteredItems = useMemo(
-    () => fuzzyFilter(items, filter, (i) => `${i.label} ${i.sublabel ?? ''}`),
-    [items, filter],
+    () => fuzzyFilter(orderedItems, filter, (i) => `${i.label} ${i.sublabel ?? ''}`),
+    [orderedItems, filter],
   );
 
   const safeItemIndex = Math.max(0, Math.min(itemIndex, filteredItems.length - 1));
@@ -312,6 +320,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
       setItems(list);
       setItemIndex(0);
       setFilter(categoryFiltersRef.current.get(cat.id) ?? '');
+      setOrder(categoryOrdersRef.current.get(cat.id) ?? 'default');
       setTypingFilter(false);
       setSearchSnapshot(null);
       setTypingSearch(false);
@@ -343,7 +352,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
       let nextIndex: number | null = null;
       setItems((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(list)) return prev;
-        const visible = fuzzyFilter(list, filterRef.current, (i) => `${i.label} ${i.sublabel ?? ''}`);
+        const visible = fuzzyFilter(sortItems(list, orderRef.current), filterRef.current, (i) => `${i.label} ${i.sublabel ?? ''}`);
         const pos = selectedIdRef.current === null
           ? -1
           : visible.findIndex((i) => i.id === selectedIdRef.current);
@@ -466,6 +475,13 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
         return;
       }
       if (input === '/') { setTypingFilter(true); return; }
+      if (input === 'o') {
+        const next: SortOrder = order === 'default' ? 'reverse' : order === 'reverse' ? 'label' : 'default';
+        setOrder(next);
+        if (selectedCategory !== null) categoryOrdersRef.current.set(selectedCategory.id, next);
+        setItemIndex(0);
+        return;
+      }
       if (input === 'a' || input === 'w') {
         if (filteredItems.length === 0) return;
         const item = filteredItems[safeItemIndex];
@@ -567,6 +583,8 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
         <Text color={col('gray')}>  ↑/↓ move (scroll in preview) · enter/→ open · esc/⌫/← back · PgUp/PgDn page (preview) · q quit</Text>
         <Text color={col('cyan')} bold>Filter (items)</Text>
         <Text color={col('gray')}>  / filter as you type · esc clears</Text>
+        <Text color={col('cyan')} bold>Sort (items)</Text>
+        <Text color={col('gray')}>  o cycle order: newest → oldest → label</Text>
         <Text color={col('cyan')} bold>Search (items)</Text>
         <Text color={col('gray')}>  s semantic search · enter run · esc cancel / restore list</Text>
         <Text color={col('cyan')} bold>Archive (items)</Text>
@@ -615,6 +633,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
       : selectedCategory?.id === 'plans'
         ? ' · p advance'
         : '';
+    const orderHint = order === 'default' ? '' : `[${order}] `;
     if (confirm !== null) {
       hint = confirmHint(confirm);
     } else if (typingSearch) {
@@ -622,7 +641,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     } else {
       hint = typingFilter
         ? filterHint
-        : `${filterHint}↑/↓ move · enter/→ open · / filter · s search · ${escHint} · a archive · w weekly${actionHint} · ? help · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+        : `${orderHint}${filterHint}↑/↓ move · enter/→ open · / filter · o sort · s search · ${escHint} · a archive · w weekly${actionHint} · ? help · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
     }
     if (filteredItems.length === 0) {
       body = (

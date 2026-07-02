@@ -540,6 +540,25 @@ describe('resolveCategoryId', () => {
   });
 });
 
+describe('sortItems', () => {
+  const items: import('./browse-data.js').BrowseItem[] = [
+    { id: 'c', label: 'Charlie', kind: 'file' },
+    { id: 'a', label: 'alpha', kind: 'file' },
+    { id: 'b', label: 'Bravo', kind: 'file' },
+  ];
+  it('default returns the input order unchanged', () => {
+    expect(mod.sortItems(items, 'default').map((i) => i.id)).toEqual(['c', 'a', 'b']);
+  });
+  it('reverse returns a reversed copy without mutating input', () => {
+    const out = mod.sortItems(items, 'reverse');
+    expect(out.map((i) => i.id)).toEqual(['b', 'a', 'c']);
+    expect(items.map((i) => i.id)).toEqual(['c', 'a', 'b']);
+  });
+  it('label sorts ascending by label', () => {
+    expect(mod.sortItems(items, 'label').map((i) => i.label)).toEqual(['alpha', 'Bravo', 'Charlie']);
+  });
+});
+
 describe('browseJsonDump', () => {
   it('dumps category counts as JSON when no category is given', async () => {
     await fs.writeFile(path.join(tmpDir, 'current.md'), '# Now\n');
