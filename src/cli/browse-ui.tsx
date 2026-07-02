@@ -235,6 +235,8 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  // Remembers each category's last filter so returning to it restores that filter.
+  const categoryFiltersRef = useRef<Map<BrowseCategory['id'], string>>(new Map());
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const searchSnapshotRef = useRef(searchSnapshot);
@@ -286,6 +288,13 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     setItemIndex(0);
   }, [filter]);
 
+  // Remember each category's last filter so returning restores it.
+  useEffect(() => {
+    if (selectedCategory !== null) {
+      categoryFiltersRef.current.set(selectedCategory.id, filter);
+    }
+  }, [filter, selectedCategory]);
+
   useEffect(() => {
     selectedIdRef.current = filteredItems[safeItemIndex]?.id ?? null;
   }, [filteredItems, safeItemIndex]);
@@ -302,7 +311,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
       setSelectedCategory(cat);
       setItems(list);
       setItemIndex(0);
-      setFilter('');
+      setFilter(categoryFiltersRef.current.get(cat.id) ?? '');
       setTypingFilter(false);
       setSearchSnapshot(null);
       setTypingSearch(false);
