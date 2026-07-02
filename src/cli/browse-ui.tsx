@@ -668,7 +668,12 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
       : filter !== ''
         ? `filter: ${filter} (esc clears) · `
         : '';
-    const escHint = searchSnapshot !== null ? 'esc restore list' : 'esc/⌫/← back';
+    // The search-results view is the only state whose back key does something
+    // unusual (restore the pre-search list), so it earns an inline note; normal
+    // ↑/↓ move · ↵ open · esc/⌫/← back are universal and live in the ? help
+    // overlay, and dropping them keeps this line inside 80 cols even with the
+    // contextual action and a 3-digit counter (see the hint assembly below).
+    const escHint = searchSnapshot !== null ? 'esc restore list · ' : '';
     // Contextual action key: only the relevant category advertises r/p, so the
     // (already long) hint line stays readable elsewhere.
     const actionHint = selectedCategory?.id === 'claims'
@@ -684,7 +689,7 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
     } else {
       hint = typingFilter
         ? filterHint
-        : `${orderHint}${filterHint}↑/↓ move · enter/→ open · / filter · o sort · s search · ${escHint} · a archive · w weekly${actionHint} · ? help · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
+        : `${orderHint}${filterHint}${escHint}/ filter · o sort · s search · a/w archive${actionHint} · ? help · q quit · ${filteredItems.length === 0 ? 0 : safeItemIndex + 1}/${filteredItems.length}`;
     }
     if (filteredItems.length === 0) {
       body = (
