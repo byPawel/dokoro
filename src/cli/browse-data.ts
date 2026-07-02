@@ -256,12 +256,31 @@ export function dbDataVersion(db: Database.Database): number {
   return row.data_version;
 }
 
+/**
+ * Poll cache for the DB-backed categories (claims/agents/entities). `version`
+ * is the SQLite data_version at fill time — a commit from ANOTHER connection
+ * bumps it (see dbDataVersion). `cachedAt` is the wall-clock fill time: even at
+ * an unchanged version the entry expires after DB_CACHE_MAX_AGE_MS, because
+ * claim expiry countdowns and holder/agent liveness are wall-clock-derived, and
+ * a quiet DB (a dead agent is exactly a stop-of-writes) would otherwise freeze
+ * them until some unrelated connection happened to commit and bump the version.
+ */
 interface DbListCache {
   version: number;
+  cachedAt: number;
   items: BrowseItem[];
 }
+const DB_CACHE_MAX_AGE_MS = 30_000;
 const claimsCache: { value: DbListCache | null } = { value: null };
 const agentsCache: { value: DbListCache | null } = { value: null };
+const entitiesCache: { value: DbListCache | null } = { value: null };
+
+/** Cached items iff the entry matches `version` AND is within the age bound. */
+function cacheHit(cache: DbListCache | null, version: number): BrowseItem[] | null {
+  if (cache === null || cache.version !== version) return null;
+  if (Date.now() - cache.cachedAt >= DB_CACHE_MAX_AGE_MS) return null;
+  return cache.items;
+}
 
 /**
  * Bust the claims/agents poll caches. PRAGMA data_version never changes for a
@@ -521,7 +540,8 @@ function claimItems(dokoroPath: string): BrowseItem[] {
   if (sqlite === null) return [dbUnavailableItem('claim')];
   try {
     const version = dbDataVersion(sqlite);
-    if (claimsCache.value !== null && claimsCache.value.version === version) return claimsCache.value.items;
+    const hit = cacheHit(claimsCache.value, version);
+    if (hit !== null) return hit;
     const now = nowSeconds(sqlite);
     const rows = sqlite.prepare(
       `SELECT claim_key, file_path, agent_id, session_id, intent,
@@ -554,7 +574,7 @@ function claimItems(dokoroPath: string): BrowseItem[] {
         detail,
       };
     });
-    claimsCache.value = { version, items };
+    claimsCache.value = { version, cachedAt: Date.now(), items };
     return items;
   } catch {
     return [dbUnavailableItem('claim')];
@@ -566,7 +586,8 @@ function agentItems(dokoroPath: string): BrowseItem[] {
   if (sqlite === null) return [dbUnavailableItem('agent')];
   try {
     const version = dbDataVersion(sqlite);
-    if (agentsCache.value !== null && agentsCache.value.version === version) return agentsCache.value.items;
+    const hit = cacheHit(agentsCache.value, version);
+    if (hit !== null) return hit;
     const now = nowSeconds(sqlite);
     const rows = sqlite.prepare(
       `SELECT agent_id, session_id, status, current_focus, last_heartbeat, heartbeat_seq
@@ -595,7 +616,7 @@ function agentItems(dokoroPath: string): BrowseItem[] {
         detail,
       };
     });
-    agentsCache.value = { version, items };
+    agentsCache.value = { version, cachedAt: Date.now(), items };
     return items;
   } catch {
     return [dbUnavailableItem('agent')];
@@ -717,6 +738,12 @@ function entityItems(dokoroPath: string): BrowseItem[] {
   const sqlite = tryDb(dokoroPath);
   if (sqlite === null) return [dbUnavailableItem('entity')];
   try {
+    // Entities carry no time-derived display fields, so the version check alone
+    // would suffice — but the poll runs 1+N synchronous queries per tick, so
+    // cache it on the shared DbListCache (age bound included for uniformity).
+    const version = dbDataVersion(sqlite);
+    const hit = cacheHit(entitiesCache.value, version);
+    if (hit !== null) return hit;
     const rows = sqlite.prepare(
       `SELECT e.id, e.type, e.name, e.description,
               (SELECT COUNT(*) FROM entity_relations er
@@ -725,7 +752,7 @@ function entityItems(dokoroPath: string): BrowseItem[] {
        ORDER BY e.updated_at DESC, e.id DESC`,
     ).all() as EntityRow[];
 
-    return rows.map((row) => {
+    const items = rows.map((row) => {
       const relations = sqlite.prepare(
         `SELECT er.relation_type, es.name AS source_name, et.name AS target_name
          FROM entity_relations er
@@ -753,6 +780,8 @@ function entityItems(dokoroPath: string): BrowseItem[] {
         detail: lines.join('\n'),
       };
     });
+    entitiesCache.value = { version, cachedAt: Date.now(), items };
+    return items;
   } catch {
     return [dbUnavailableItem('entity')];
   }

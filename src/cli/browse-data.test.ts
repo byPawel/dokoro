@@ -681,6 +681,42 @@ describe('claims/agents poll short-circuit', () => {
     const second = await mod.listItems(tmpDir, 'claims');
     expect(second).toBe(first); // cached reference — query skipped
   });
+
+  it('returns the same items reference when data_version is unchanged (entities)', async () => {
+    insertEntity('project', 'dokoro');
+    const first = await mod.listItems(tmpDir, 'entities');
+    const second = await mod.listItems(tmpDir, 'entities');
+    expect(second).toBe(first); // cached reference — 1+N query skipped
+  });
+});
+
+// The version check alone can't see time pass: PRAGMA data_version is unchanged
+// for the connection's OWN writes AND while the DB is simply quiet. Claim expiry
+// countdowns and holder liveness are wall-clock-derived, so a dead agent (which
+// is exactly a stop-of-writes) would freeze the display without an age bound.
+describe('claims poll cache: wall-clock age bound (liveness cannot freeze on a quiet DB)', () => {
+  it('re-queries after ~30s even at an unchanged data_version, so an expired claim drops off', async () => {
+    insertLiveClaim('src/frozen.ts', 'alice', 600);
+    const base = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(base);
+
+    const first = await mod.listItems(tmpDir, 'claims');
+    expect(first).toHaveLength(1);
+    expect(first[0].label).toBe('src/frozen.ts');
+
+    // Expire the claim through the SAME connection the poll reads: PRAGMA
+    // data_version is NOT bumped by a connection's own write, so the version
+    // check alone would keep serving the cached (still-present) claim forever.
+    db.prepare(`UPDATE file_claims SET expires_at = strftime('%s','now') - 10 WHERE claim_key = 'src/frozen.ts'`).run();
+
+    // Advance the wall clock past the 30s age bound → cache is stale → re-query.
+    nowSpy.mockReturnValue(base + 31_000);
+    const second = await mod.listItems(tmpDir, 'claims');
+    expect(second).not.toBe(first); // age bound forced a re-query, not the cache
+    expect(second).toEqual([]); // the now-expired claim dropped off
+
+    nowSpy.mockRestore();
+  });
 });
 
 // End-to-end through claimItems/agentItems (not just the dbDataVersion
