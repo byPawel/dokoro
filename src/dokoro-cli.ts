@@ -549,6 +549,14 @@ async function main(): Promise<void> {
         if (flags.json === true || typeof flags.json === "string") {
           const { browseJsonDump, resolveCategoryId } = await import("./cli/browse-data.js");
           const catId = initialCategory !== undefined ? resolveCategoryId(initialCategory) : null;
+          // A bogus --category must not dump the categories shape as if it
+          // succeeded — a script parsing stdout would read a mis-shaped success.
+          // Fail loudly on stderr with a non-zero exit and emit nothing on stdout.
+          if (initialCategory !== undefined && catId === null) {
+            console.error(`unknown category: ${initialCategory}`);
+            process.exitCode = 1;
+            break;
+          }
           console.log(await browseJsonDump(dokoroPath, catId ?? undefined));
           break;
         }
