@@ -17,6 +17,15 @@ export interface MdSpan {
 
 export type MdLine = MdSpan[];
 
+/** https://no-color.org — colors off when NO_COLOR is set and non-empty. */
+export const colorsEnabled: boolean =
+  process.env.NO_COLOR === undefined || process.env.NO_COLOR === '';
+
+/** Drop color/dim from spans when colors are disabled; keep text/bold/italic. */
+function stripColors(lines: MdLine[]): MdLine[] {
+  return lines.map((line) => line.map(({ text, bold, italic }) => ({ text, bold, italic })));
+}
+
 /** Plain text → one unstyled span per line (for non-markdown content). */
 export function plainToLines(text: string): MdLine[] {
   return text.split('\n').map((line) => [{ text: line }]);
@@ -128,7 +137,7 @@ export function renderMarkdown(raw: string): MdLine[] {
 
       out.push(parseInline(line));
     }
-    return out;
+    return colorsEnabled ? out : stripColors(out);
   } catch {
     return plainToLines(raw);
   }

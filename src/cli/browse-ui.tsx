@@ -40,7 +40,7 @@ import {
 import { startPolling, watchDirs } from './browse-live.js';
 import { fuzzyFilter } from './fuzzy.js';
 import { semanticSearchItems } from './semantic-search.js';
-import { lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
+import { colorsEnabled, lineText, plainToLines, renderMarkdown, type MdLine } from './markdown-ansi.js';
 import { archiveDailyFile, archivePlan } from '../utils/archive.js';
 import { nextPlanStatus, planTransition, readPlanStatus, releaseClaim } from './browse-actions.js';
 import { DOKORO_PATH } from '../shared/dokoro-utils.js';
@@ -79,25 +79,25 @@ function windowSlice<T>(list: T[], selected: number, height: number): { slice: T
   return { slice: list.slice(start, start + height), start };
 }
 
-const Header: React.FC<{ crumbs: string[]; width: number }> = ({ crumbs, width }) => (
+const Header: React.FC<{ crumbs: string[]; width: number; colorsEnabled: boolean }> = ({ crumbs, width, colorsEnabled: colorsOn }) => (
   <Box flexDirection="column">
     <Text wrap="truncate-end">
-      <Text color="cyan" bold>dokoro</Text>
+      <Text color={colorsOn ? 'cyan' : undefined} bold>dokoro</Text>
       {crumbs.map((crumb, i) => (
         <Text key={i}>
-          <Text color="gray"> › </Text>
+          <Text color={colorsOn ? 'gray' : undefined}> › </Text>
           <Text bold={i === crumbs.length - 1}>{crumb}</Text>
         </Text>
       ))}
     </Text>
-    <Text color="gray">{'─'.repeat(Math.max(10, width))}</Text>
+    <Text color={colorsOn ? 'gray' : undefined}>{'─'.repeat(Math.max(10, width))}</Text>
   </Box>
 );
 
-const Footer: React.FC<{ hint: string; width: number }> = ({ hint, width }) => (
+const Footer: React.FC<{ hint: string; width: number; colorsEnabled: boolean }> = ({ hint, width, colorsEnabled: colorsOn }) => (
   <Box flexDirection="column">
-    <Text color="gray">{'─'.repeat(Math.max(10, width))}</Text>
-    <Text color="gray" wrap="truncate-end">{hint}</Text>
+    <Text color={colorsOn ? 'gray' : undefined}>{'─'.repeat(Math.max(10, width))}</Text>
+    <Text color={colorsOn ? 'gray' : undefined} wrap="truncate-end">{hint}</Text>
   </Box>
 );
 
@@ -118,6 +118,8 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
   const width = Math.max(20, (stdout?.columns ?? 80) - 2);
   // Header (2 lines) + footer (2 lines) + padding line.
   const viewport = Math.max(3, rows - 5);
+  // NO_COLOR: collapse every hardcoded color prop to undefined; dim falls away.
+  const col = (c?: string): string | undefined => (colorsEnabled ? c : undefined);
 
   const [level, setLevel] = useState<Level>('categories');
   const [categories, setCategories] = useState<BrowseCategory[] | null>(null);
@@ -552,18 +554,18 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     hint = 'press any key to close help';
     body = (
       <Box flexDirection="column">
-        <Text color="cyan" bold>Navigation</Text>
-        <Text color="gray">  ↑/↓ move (scroll in preview) · enter/→ open · esc/⌫/← back · PgUp/PgDn page (preview) · q quit</Text>
-        <Text color="cyan" bold>Filter (items)</Text>
-        <Text color="gray">  / filter as you type · esc clears</Text>
-        <Text color="cyan" bold>Search (items)</Text>
-        <Text color="gray">  s semantic search · enter run · esc cancel / restore list</Text>
-        <Text color="cyan" bold>Archive (items)</Text>
-        <Text color="gray">  a archive live plan or daily file · w archive daily file → weekly · y/n confirm</Text>
-        <Text color="cyan" bold>Claims & plans (items)</Text>
-        <Text color="gray">  r release a stale file claim (refused if holder live) · p advance a plan (draft→active→completed) · y/n confirm</Text>
-        <Text color="cyan" bold>Help</Text>
-        <Text color="gray">  ? open this help · any key closes it</Text>
+        <Text color={col('cyan')} bold>Navigation</Text>
+        <Text color={col('gray')}>  ↑/↓ move (scroll in preview) · enter/→ open · esc/⌫/← back · PgUp/PgDn page (preview) · q quit</Text>
+        <Text color={col('cyan')} bold>Filter (items)</Text>
+        <Text color={col('gray')}>  / filter as you type · esc clears</Text>
+        <Text color={col('cyan')} bold>Search (items)</Text>
+        <Text color={col('gray')}>  s semantic search · enter run · esc cancel / restore list</Text>
+        <Text color={col('cyan')} bold>Archive (items)</Text>
+        <Text color={col('gray')}>  a archive live plan or daily file · w archive daily file → weekly · y/n confirm</Text>
+        <Text color={col('cyan')} bold>Claims & plans (items)</Text>
+        <Text color={col('gray')}>  r release a stale file claim (refused if holder live) · p advance a plan (draft→active→completed) · y/n confirm</Text>
+        <Text color={col('cyan')} bold>Help</Text>
+        <Text color={col('gray')}>  ? open this help · any key closes it</Text>
       </Box>
     );
   } else if (level === 'categories') {
@@ -571,7 +573,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     const catPos = catCount === 0 ? 0 : Math.min(catIndex, catCount - 1) + 1;
     hint = `↑/↓ move · enter/→ open · ? help · q/esc quit · ${catPos}/${catCount}`;
     if (categories === null) {
-      body = <Text color="gray">Loading…</Text>;
+      body = <Text color={col('gray')}>Loading…</Text>;
     } else {
       const { slice, start } = windowSlice(categories, catIndex, viewport);
       body = (
@@ -580,10 +582,10 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
             const selected = start + i === catIndex;
             return (
               <Text key={cat.id} wrap="truncate-end">
-                <Text color={selected ? 'cyan' : undefined} bold={selected}>
+                <Text color={selected ? col('cyan') : undefined} bold={selected}>
                   {selected ? '▸ ' : '  '}{cat.label}
                 </Text>
-                <Text color="gray"> ({cat.count})</Text>
+                <Text color={col('gray')}> ({cat.count})</Text>
               </Text>
             );
           })}
@@ -615,7 +617,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     }
     if (filteredItems.length === 0) {
       body = (
-        <Text color="gray">
+        <Text color={col('gray')}>
           {items.length === 0 ? '(no items)' : `(no items match "${filter}")`}
         </Text>
       );
@@ -627,10 +629,10 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
             const selected = start + i === safeItemIndex;
             return (
               <Text key={item.id} wrap="truncate-end">
-                <Text color={selected ? 'cyan' : undefined} bold={selected} dimColor={item.archived === true && !selected}>
+                <Text color={selected ? col('cyan') : undefined} bold={selected} dimColor={colorsEnabled ? (item.archived === true && !selected) : false}>
                   {selected ? '▸ ' : '  '}{item.label}
                 </Text>
-                {item.sublabel !== undefined && <Text color="gray">  {item.sublabel}</Text>}
+                {item.sublabel !== undefined && <Text color={col('gray')}>  {item.sublabel}</Text>}
               </Text>
             );
           })}
@@ -654,7 +656,7 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
             {lineText(line) === '' ? ' ' : line.map((s, j) => (
               <Text
                 key={j}
-                color={pulseLines.has(scroll + i) ? 'yellow' : s.color}
+                color={pulseLines.has(scroll + i) ? col('yellow') : s.color}
                 bold={pulseLines.has(scroll + i) ? true : s.bold}
                 dimColor={pulseLines.has(scroll + i) ? false : s.dim}
                 italic={s.italic}
@@ -675,13 +677,14 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
 
   return (
     <Box flexDirection="column">
-      <Header crumbs={crumbs} width={width} />
+      <Header crumbs={crumbs} width={width} colorsEnabled={colorsEnabled} />
       <Box flexDirection="column" minHeight={viewport}>
         {body}
       </Box>
       <Footer
         hint={toast !== null ? `⚑ ${toast}` : spinnerOn ? `${SPINNER_FRAMES[spinnerFrame]} ${hint}` : hint}
         width={width}
+        colorsEnabled={colorsEnabled}
       />
     </Box>
   );

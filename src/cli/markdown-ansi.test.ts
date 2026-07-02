@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { renderMarkdown, plainToLines, lineText, type MdLine } from './markdown-ansi.js';
 
 describe('plainToLines', () => {
@@ -58,5 +58,46 @@ describe('renderMarkdown', () => {
 
   it('empty string yields a single empty line', () => {
     expect(renderMarkdown('').map(lineText)).toEqual(['']);
+  });
+});
+
+describe('colorsEnabled / NO_COLOR', () => {
+  const original = process.env.NO_COLOR;
+  afterEach(() => {
+    if (original === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = original;
+  });
+
+  function load(): typeof import('./markdown-ansi.js') {
+    let m!: typeof import('./markdown-ansi.js');
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      m = require('./markdown-ansi.js') as typeof import('./markdown-ansi.js');
+    });
+    return m;
+  }
+
+  it('enables colors when NO_COLOR is unset', () => {
+    delete process.env.NO_COLOR;
+    const m = load();
+    expect(m.colorsEnabled).toBe(true);
+    const [h1] = m.renderMarkdown('# Title');
+    expect(h1.some((s) => s.color === 'cyan')).toBe(true);
+  });
+
+  it('suppresses color and dim when NO_COLOR is set', () => {
+    process.env.NO_COLOR = '1';
+    const m = load();
+    expect(m.colorsEnabled).toBe(false);
+    const [h1] = m.renderMarkdown('# Title');
+    expect(h1.every((s) => s.color === undefined)).toBe(true);
+    const fm = m.renderMarkdown('---\ntitle: x\n---');
+    expect(fm[0].every((s) => s.dim === undefined)).toBe(true);
+  });
+
+  it('treats an empty NO_COLOR as unset (colors on)', () => {
+    process.env.NO_COLOR = '';
+    const m = load();
+    expect(m.colorsEnabled).toBe(true);
   });
 });
