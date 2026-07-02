@@ -130,6 +130,86 @@ describe('releaseClaim', () => {
   });
 });
 
+// Regression coverage for the browse-data.ts claims/agents poll cache: in
+// production, browse-actions and browse-data share ONE process-cached SQLite
+// connection (getSqliteDb keys by dbPath), so a release here happens on the
+// SAME connection the poll's dbDataVersion check reads from — and
+// PRAGMA data_version never changes for a connection's own writes. Without an
+// explicit cache invalidation, the poll would keep showing a released claim
+// forever until some unrelated connection wrote to the DB. Both modules must
+// share the same module instance for this to be meaningful, so both are
+// required inside one jest.isolateModules sandbox (mirrors browse-data.test.ts's
+// freshModule pattern, extended to two modules).
+describe('releaseClaim invalidates the browse-data poll cache (same connection)', () => {
+  type ActionsModule = typeof import('./browse-actions.js');
+  type BrowseDataModule = typeof import('./browse-data.js');
+
+  let db: Database.Database;
+  const DOKORO = '/repo/dokoro';
+
+  function freshModules(): Promise<{ actionsMod: ActionsModule; dataMod: BrowseDataModule }> {
+    return new Promise((resolve) => {
+      jest.isolateModules(() => {
+        resolve({
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          actionsMod: require('./browse-actions.js') as ActionsModule,
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          dataMod: require('./browse-data.js') as BrowseDataModule,
+        });
+      });
+    });
+  }
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE file_claims (
+        claim_key TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        session_id TEXT,
+        intent TEXT,
+        claimed_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        heartbeat_seq INTEGER NOT NULL DEFAULT 0,
+        released_at INTEGER
+      );
+      CREATE TABLE agent_presence (
+        agent_id TEXT PRIMARY KEY,
+        session_id TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        current_focus TEXT,
+        last_heartbeat INTEGER NOT NULL,
+        heartbeat_seq INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+    (globalThis as Record<string, unknown>).__TEST_DB__ = db;
+  });
+  afterEach(() => { db.close(); delete (globalThis as Record<string, unknown>).__TEST_DB__; });
+
+  it('removes a released claim from listItems on the very next poll', async () => {
+    const { actionsMod, dataMod } = await freshModules();
+    db.prepare(`
+      INSERT INTO file_claims (claim_key, file_path, agent_id, intent, claimed_at, expires_at, heartbeat_seq, released_at)
+      VALUES ('src/a.ts', 'src/a.ts', 'alice', 'edit', strftime('%s','now'), strftime('%s','now') + 600, 0, NULL)
+    `).run();
+
+    const before = await dataMod.listItems(DOKORO, 'claims');
+    expect(before).toHaveLength(1);
+    expect(before[0].id).toBe('src/a.ts');
+
+    // No presence row for 'alice' -> holder is not live -> releasable.
+    const res = actionsMod.releaseClaim(DOKORO, 'src/a.ts');
+    expect(res.outcome).toBe('released');
+
+    // Same connection throughout: without an explicit cache invalidation this
+    // would still show the released claim, since PRAGMA data_version doesn't
+    // change for the connection's own writes.
+    const after = await dataMod.listItems(DOKORO, 'claims');
+    expect(after).toHaveLength(0);
+  });
+});
+
 describe('planTransition / readPlanStatus / nextPlanStatus', () => {
   let tmpDir: string;
 

@@ -261,6 +261,20 @@ interface DbListCache {
 const claimsCache: { value: DbListCache | null } = { value: null };
 const agentsCache: { value: DbListCache | null } = { value: null };
 
+/**
+ * Bust the claims/agents poll caches. PRAGMA data_version never changes for a
+ * connection's own writes, and in production browse-data/browse-actions share
+ * ONE process-cached connection (getSqliteDb keys by dbPath) — so a mutation
+ * made through browse-actions (e.g. releaseClaim) would otherwise leave the
+ * poll showing stale items until an unrelated connection wrote to the DB.
+ * Callers that mutate file_claims/agent_presence on the shared connection
+ * must call this after a successful write.
+ */
+export function invalidateDbCaches(): void {
+  claimsCache.value = null;
+  agentsCache.value = null;
+}
+
 /** Holder liveness from agent_presence; any failure degrades to 'unknown'. */
 function presenceLabel(sqlite: Database.Database, agentId: string, now: number): 'live' | 'stale' | 'unknown' {
   try {

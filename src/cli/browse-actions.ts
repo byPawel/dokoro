@@ -17,7 +17,12 @@
  * module-level DOKORO_PATH), so these run correctly under a `--path` override
  * with no extra guard needed. DB access mirrors browse-data.ts's tryDb: a
  * test-injected `globalThis.__TEST_DB__` handle wins, otherwise the project
- * database via getSqliteDb({ projectPath: dirname(dokoroPath), ... }).
+ * database via getSqliteDb({ projectPath: dirname(dokoroPath), ... }) — which
+ * caches ONE connection per dbPath, shared with browse-data.ts's poll. A
+ * successful releaseClaim therefore calls browse-data's invalidateDbCaches():
+ * PRAGMA data_version never changes for a connection's own writes, so without
+ * this the poll would keep showing the released claim until an unrelated
+ * connection wrote to the DB.
  */
 
 import { promises as fs } from 'fs';
@@ -25,6 +30,7 @@ import path from 'path';
 import type Database from 'better-sqlite3';
 import { getSqliteDb } from '../db/index.js';
 import { writeFileAtomic } from '../utils/archive.js';
+import { invalidateDbCaches } from './browse-data.js';
 
 /** Presence liveness window — matches file-claim-tools / browse-data. */
 const PRESENCE_TTL_SECONDS = 900;
@@ -136,7 +142,14 @@ export function releaseClaim(dokoroPath: string, claimKey: string): ReleaseClaim
     ).run(claimKey);
     // changes === 0: a concurrent writer released (or pruned) it between our
     // read and write — the file is no longer held either way.
-    return info.changes === 1 ? { outcome: 'released' } : { outcome: 'alreadyReleased' };
+    if (info.changes === 1) {
+      // Same-connection write (browse-actions/browse-data share one cached
+      // connection) — PRAGMA data_version won't reflect it, so bust the
+      // browse-data poll cache explicitly.
+      invalidateDbCaches();
+      return { outcome: 'released' };
+    }
+    return { outcome: 'alreadyReleased' };
   } catch (error: unknown) {
     return { outcome: 'failed', error: errMsg(error) };
   }

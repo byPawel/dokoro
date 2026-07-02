@@ -618,3 +618,79 @@ describe('claims/agents poll short-circuit', () => {
     expect(second).toBe(first); // cached reference — query skipped
   });
 });
+
+// End-to-end through claimItems/agentItems (not just the dbDataVersion
+// primitive): a genuinely independent second connection to the same
+// file-backed DB must bump data_version and bust the cache. This is the path
+// production relies on when the write comes from another process.
+describe('claims/agents poll integration: a real second connection', () => {
+  const schema = `
+    CREATE TABLE file_claims (
+      claim_key TEXT PRIMARY KEY,
+      file_path TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      session_id TEXT,
+      intent TEXT,
+      claimed_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      heartbeat_seq INTEGER NOT NULL DEFAULT 0,
+      released_at INTEGER
+    );
+    CREATE TABLE agent_presence (
+      agent_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      current_focus TEXT,
+      last_heartbeat INTEGER NOT NULL,
+      heartbeat_seq INTEGER NOT NULL DEFAULT 0
+    );
+  `;
+
+  it("listItems('claims') sees a claim inserted by another connection", async () => {
+    const file = path.join(tmpDir, 'claims-integration.sqlite');
+    const a = new Database(file);
+    a.exec(schema);
+    (globalThis as Record<string, unknown>).__TEST_DB__ = a;
+
+    const first = await mod.listItems(tmpDir, 'claims');
+    expect(first).toEqual([]);
+
+    const b = new Database(file);
+    b.prepare(`
+      INSERT INTO file_claims (claim_key, file_path, agent_id, intent, claimed_at, expires_at, heartbeat_seq, released_at)
+      VALUES ('src/other-conn.ts', 'src/other-conn.ts', 'dave', 'edit', strftime('%s','now'), strftime('%s','now') + 600, 0, NULL)
+    `).run();
+    b.close();
+
+    const second = await mod.listItems(tmpDir, 'claims');
+    expect(second).not.toBe(first);
+    expect(second).toHaveLength(1);
+    expect(second[0].label).toBe('src/other-conn.ts');
+
+    a.close();
+  });
+
+  it("listItems('agents') sees an agent inserted by another connection (symmetric coverage)", async () => {
+    const file = path.join(tmpDir, 'agents-integration.sqlite');
+    const a = new Database(file);
+    a.exec(schema);
+    (globalThis as Record<string, unknown>).__TEST_DB__ = a;
+
+    const first = await mod.listItems(tmpDir, 'agents');
+    expect(first).toEqual([]);
+
+    const b = new Database(file);
+    b.prepare(`
+      INSERT INTO agent_presence (agent_id, status, last_heartbeat)
+      VALUES ('agent-other-conn', 'active', strftime('%s','now'))
+    `).run();
+    b.close();
+
+    const second = await mod.listItems(tmpDir, 'agents');
+    expect(second).not.toBe(first);
+    expect(second).toHaveLength(1);
+    expect(second[0].label).toBe('agent-other-conn');
+
+    a.close();
+  });
+});
