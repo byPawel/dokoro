@@ -39,6 +39,7 @@ export type BrowseCategoryId =
   | 'agents'
   | 'questions'
   | 'feedback'
+  | 'entities'
   | 'sweep';
 
 export interface BrowseCategory {
@@ -51,7 +52,7 @@ export interface BrowseItem {
   id: string;
   label: string;
   sublabel?: string;
-  kind: 'file' | 'plan' | 'claim' | 'agent' | 'question' | 'feedback';
+  kind: 'file' | 'plan' | 'claim' | 'agent' | 'question' | 'feedback' | 'entity';
   /** Absolute path for file/plan items. */
   path?: string;
   archived?: boolean;
@@ -143,6 +144,7 @@ const CATEGORY_LABELS: Record<BrowseCategoryId, string> = {
   agents: 'Agent presence',
   questions: 'Questions',
   feedback: 'Feedback',
+  entities: 'Entities',
   sweep: 'Archive sweep status',
 };
 
@@ -287,7 +289,7 @@ function presenceLabel(sqlite: Database.Database, agentId: string, now: number):
   }
 }
 
-function dbUnavailableItem(kind: 'claim' | 'agent' | 'feedback'): BrowseItem {
+function dbUnavailableItem(kind: 'claim' | 'agent' | 'feedback' | 'entity'): BrowseItem {
   return { id: `${kind}s-db-unavailable`, label: '(database unavailable)', kind };
 }
 
@@ -352,6 +354,7 @@ export function dirsForCategory(dokoroPath: string, category: BrowseCategoryId):
     case 'claims':
     case 'agents':
     case 'feedback':
+    case 'entities':
       return null;
   }
 }
@@ -373,6 +376,7 @@ export async function listItems(dokoroPath: string, category: BrowseCategoryId):
       case 'agents': return agentItems(dokoroPath);
       case 'questions': return await questionItems(dokoroPath);
       case 'feedback': return feedbackItems(dokoroPath);
+      case 'entities': return entityItems(dokoroPath);
       case 'sweep': return await sweepItems(dokoroPath);
     }
   } catch {
@@ -690,6 +694,67 @@ function feedbackItems(dokoroPath: string): BrowseItem[] {
     });
   } catch {
     return [dbUnavailableItem('feedback')];
+  }
+}
+
+interface EntityRow {
+  id: number;
+  type: string;
+  name: string;
+  description: string | null;
+  relation_count: number;
+}
+
+interface EntityRelationRow {
+  relation_type: string;
+  source_name: string;
+  target_name: string;
+}
+
+/** Read-only entity-graph view. Newest first (updated_at). Currently-valid
+ * relations only (valid_to IS NULL). Unavailable DB → one placeholder item. */
+function entityItems(dokoroPath: string): BrowseItem[] {
+  const sqlite = tryDb(dokoroPath);
+  if (sqlite === null) return [dbUnavailableItem('entity')];
+  try {
+    const rows = sqlite.prepare(
+      `SELECT e.id, e.type, e.name, e.description,
+              (SELECT COUNT(*) FROM entity_relations er
+               WHERE (er.source_id = e.id OR er.target_id = e.id) AND er.valid_to IS NULL) AS relation_count
+       FROM entities e
+       ORDER BY e.updated_at DESC, e.id DESC`,
+    ).all() as EntityRow[];
+
+    return rows.map((row) => {
+      const relations = sqlite.prepare(
+        `SELECT er.relation_type, es.name AS source_name, et.name AS target_name
+         FROM entity_relations er
+         JOIN entities es ON er.source_id = es.id
+         JOIN entities et ON er.target_id = et.id
+         WHERE (er.source_id = ? OR er.target_id = ?) AND er.valid_to IS NULL
+         ORDER BY er.valid_from DESC`,
+      ).all(row.id, row.id) as EntityRelationRow[];
+
+      const lines = [
+        'Entity',
+        '──────',
+        `Name:      ${row.name}`,
+        `Type:      ${row.type}`,
+      ];
+      if (row.description !== null && row.description !== '') lines.push(`Desc:      ${row.description}`);
+      lines.push('', `Relations (${relations.length}):`);
+      for (const r of relations) lines.push(`  ${r.source_name} --[${r.relation_type}]--> ${r.target_name}`);
+
+      return {
+        id: `entity-${row.id}`,
+        label: row.name,
+        sublabel: `${row.type} · ${row.relation_count} relation${row.relation_count === 1 ? '' : 's'}`,
+        kind: 'entity' as const,
+        detail: lines.join('\n'),
+      };
+    });
+  } catch {
+    return [dbUnavailableItem('entity')];
   }
 }
 

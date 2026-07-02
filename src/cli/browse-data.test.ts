@@ -103,6 +103,14 @@ function insertFeedback(
   );
 }
 
+function insertEntity(type: string, name: string, opts: { description?: string; updatedAt?: string } = {}): number {
+  const info = db.prepare(`
+    INSERT INTO entities (type, name, canonical_name, description, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(type, name, name.toLowerCase(), opts.description ?? null, opts.updatedAt ?? new Date().toISOString());
+  return Number(info.lastInsertRowid);
+}
+
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dokoro-browse-test-'));
 
@@ -140,6 +148,28 @@ beforeEach(async () => {
       session_id TEXT,
       metadata_json TEXT,
       recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE entities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      canonical_name TEXT NOT NULL,
+      description TEXT,
+      metadata_json TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(type, canonical_name)
+    );
+    CREATE TABLE entity_relations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_id INTEGER NOT NULL,
+      target_id INTEGER NOT NULL,
+      relation_type TEXT NOT NULL,
+      weight REAL DEFAULT 1.0,
+      metadata_json TEXT,
+      valid_from TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      valid_to TEXT,
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
     );
   `);
   (globalThis as Record<string, unknown>).__TEST_DB__ = db;
@@ -190,13 +220,14 @@ describe('listCategories', () => {
       agents: 1,
       questions: 2,
       feedback: 2,
+      entities: 0,
       sweep: 0,
     });
   });
 
   it('handles a completely empty/missing workspace without crashing', async () => {
     const categories = await mod.listCategories(path.join(tmpDir, 'does-not-exist'));
-    expect(categories).toHaveLength(10);
+    expect(categories).toHaveLength(11);
     // claims/agents/feedback read the (empty) injected DB → 0; everything else
     // has no backing dir/file → 0. All categories are 0 in an empty workspace.
     for (const cat of categories) {
@@ -450,6 +481,39 @@ describe('listItems: feedback', () => {
     expect(items).toHaveLength(1);
     expect(items[0].label).toBe('(database unavailable)');
     expect(items[0].kind).toBe('feedback');
+  });
+});
+
+describe('listItems: entities', () => {
+  it('lists entities newest first with type and relation count, and a detail card', async () => {
+    const alice = insertEntity('person', 'Alice', { description: 'a person', updatedAt: '2026-06-01T09:00:00Z' });
+    const dokoro = insertEntity('project', 'dokoro', { updatedAt: '2026-06-10T09:00:00Z' });
+    db.prepare(`
+      INSERT INTO entity_relations (source_id, target_id, relation_type, valid_from, valid_to)
+      VALUES (?, ?, 'works_on', strftime('%Y-%m-%dT%H:%M:%SZ','now'), NULL)
+    `).run(alice, dokoro);
+
+    const items = await mod.listItems(tmpDir, 'entities');
+    expect(items.map((i) => i.label)).toEqual(['dokoro', 'Alice']); // newest updated_at first
+    expect(items.every((i) => i.kind === 'entity')).toBe(true);
+
+    const aliceItem = items.find((i) => i.label === 'Alice');
+    expect(aliceItem?.sublabel).toBe('person · 1 relation');
+    const detail = await mod.readItemContent(aliceItem!);
+    expect(detail).toContain('Entity');
+    expect(detail).toContain('Alice --[works_on]--> dokoro');
+  });
+
+  it('returns an empty list when there are no entities', async () => {
+    expect(await mod.listItems(tmpDir, 'entities')).toEqual([]);
+  });
+
+  it('falls back to a "(database unavailable)" item when the DB cannot be opened', async () => {
+    delete (globalThis as Record<string, unknown>).__TEST_DB__;
+    const items = await mod.listItems(tmpDir, 'entities');
+    expect(items).toHaveLength(1);
+    expect(items[0].label).toBe('(database unavailable)');
+    expect(items[0].kind).toBe('entity');
   });
 });
 
