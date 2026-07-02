@@ -30,6 +30,12 @@ const shared = {
  *    .ts/.tsx graph as ESM. Requires `--experimental-vm-modules` (set in the
  *    `test` npm script).
  *
+ * NOTE: testMatch is narrower than jest's default — ONLY .test.ts and
+ * .test.tsx files under src/ run. A .spec.ts, a __tests__/ file, a .test.js,
+ * or a test outside src/ will be silently skipped; name new tests to the
+ * co-located .test.ts(x) convention (site/compare-table.test.mjs runs via
+ * the separate `test:site` script).
+ *
  * @type {import('ts-jest').JestConfigWithTsJest}
  */
 export default {
