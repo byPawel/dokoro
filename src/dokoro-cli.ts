@@ -89,7 +89,7 @@ COMMANDS:
   tags [--doc=ID]         List tags (optionally for specific doc)
   tag <id> <tag>          Add tag to document
   untag <id> <tag>        Remove tag from document
-  browse [--path=DIR]     Interactive workspace browser (TUI)
+  browse [--path=DIR] [--category=ID] [--json]   Interactive workspace browser (TUI)
 
   session start [--focus=ID]   Start work session
   session end [--summary=X]    End work session
@@ -105,6 +105,7 @@ OPTIONS:
   --project=PATH          Override project path
   --dokoro=FOLDER         Override dokoro folder name
   --path=DIR              Dokoro folder for 'browse' (default: auto-discover)
+  --category=ID           Open 'browse' directly at a category (e.g. plans, claims)
   --help                  Show this help
 
 EXAMPLES:
@@ -544,7 +545,8 @@ async function main(): Promise<void> {
           typeof flags.path === "string"
             ? path.resolve(flags.path)
             : path.join(config.projectPath, config.dokoroFolder ?? "dokoro");
-        await runBrowse(dokoroPath);
+        const initialCategory = typeof flags.category === "string" ? flags.category : undefined;
+        await runBrowse(dokoroPath, initialCategory);
         break;
       }
 

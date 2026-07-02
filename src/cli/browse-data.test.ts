@@ -527,3 +527,15 @@ describe('readItemContent', () => {
     expect(content).toBe('(nothing selected)');
   });
 });
+
+describe('resolveCategoryId', () => {
+  it('resolves known ids case-insensitively', () => {
+    expect(mod.resolveCategoryId('plans')).toBe('plans');
+    expect(mod.resolveCategoryId('CLAIMS')).toBe('claims');
+    expect(mod.resolveCategoryId('  Feedback ')).toBe('feedback');
+  });
+  it('returns null for unknown or empty input', () => {
+    expect(mod.resolveCategoryId('nope')).toBeNull();
+    expect(mod.resolveCategoryId('')).toBeNull();
+  });
+});

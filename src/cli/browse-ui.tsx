@@ -33,6 +33,7 @@ import {
   listCategories,
   listItems,
   readItemContent,
+  resolveCategoryId,
   type BrowseCategory,
   type BrowseItem,
 } from './browse-data.js';
@@ -110,7 +111,7 @@ function toMdLines(item: BrowseItem, content: string): MdLine[] {
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
+const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({ dokoroPath, initialCategory }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
@@ -237,6 +238,7 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   const searchSnapshotRef = useRef(searchSnapshot);
   searchSnapshotRef.current = searchSnapshot;
   const selectedIdRef = useRef<string | null>(null);
+  const didJumpRef = useRef(false);
   const contentRef = useRef<MdLine[]>([]);
   contentRef.current = contentLines;
   const viewportRef = useRef(viewport);
@@ -257,7 +259,15 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
   }, [spinnerOn]);
 
   useEffect(() => {
-    void listCategories(dokoroPath).then(setCategories);
+    void listCategories(dokoroPath).then((cats) => {
+      setCategories(cats);
+      if (initialCategory === undefined || didJumpRef.current) return;
+      didJumpRef.current = true;
+      const id = resolveCategoryId(initialCategory);
+      const cat = id !== null ? cats.find((c) => c.id === id) ?? null : null;
+      if (cat !== null) openCategory(cat);
+      else setToast(`unknown category: ${initialCategory}`);
+    });
   }, [dokoroPath]);
 
   const filteredItems = useMemo(
@@ -681,8 +691,22 @@ const BrowseApp: React.FC<{ dokoroPath: string }> = ({ dokoroPath }) => {
  * Run the browse TUI. When stdin/stdout is not a TTY (raw mode unavailable,
  * e.g. piped input), prints a static category summary instead of crashing.
  */
-export async function runBrowse(dokoroPath: string): Promise<void> {
+export async function runBrowse(dokoroPath: string, initialCategory?: string): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    const catId = initialCategory !== undefined ? resolveCategoryId(initialCategory) : null;
+    if (initialCategory !== undefined && catId === null) {
+      console.log(`dokoro browse — ${dokoroPath}`);
+      console.log(`(unknown category: ${initialCategory})`);
+      return;
+    }
+    if (catId !== null) {
+      const items = await listItems(dokoroPath, catId);
+      console.log(`dokoro browse — ${dokoroPath} — ${catId}`);
+      for (const item of items) {
+        console.log(`  ${item.label}${item.sublabel !== undefined ? `  ${item.sublabel}` : ''}`);
+      }
+      return;
+    }
     const categories = await listCategories(dokoroPath);
     console.log(`dokoro browse — ${dokoroPath}`);
     console.log('(interactive mode requires a TTY; showing a static summary)');
@@ -692,6 +716,6 @@ export async function runBrowse(dokoroPath: string): Promise<void> {
     return;
   }
 
-  const { waitUntilExit } = render(<BrowseApp dokoroPath={dokoroPath} />, { exitOnCtrlC: true });
+  const { waitUntilExit } = render(<BrowseApp dokoroPath={dokoroPath} initialCategory={initialCategory} />, { exitOnCtrlC: true });
   await waitUntilExit();
 }

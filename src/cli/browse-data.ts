@@ -146,6 +146,13 @@ const CATEGORY_LABELS: Record<BrowseCategoryId, string> = {
   sweep: 'Archive sweep status',
 };
 
+/** Validate a raw CLI/user category string against the known ids. */
+export function resolveCategoryId(input: string): BrowseCategoryId | null {
+  const key = input.trim().toLowerCase();
+  const ids = Object.keys(CATEGORY_LABELS) as BrowseCategoryId[];
+  return ids.includes(key as BrowseCategoryId) ? (key as BrowseCategoryId) : null;
+}
+
 /** Presence liveness window — matches dokoro_presence_list / claim tools. */
 const PRESENCE_TTL_SECONDS = 900;
 
