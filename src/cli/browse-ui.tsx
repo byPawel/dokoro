@@ -117,7 +117,7 @@ function toMdLines(item: BrowseItem, content: string): MdLine[] {
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({ dokoroPath, initialCategory }) => {
+export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({ dokoroPath, initialCategory }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
