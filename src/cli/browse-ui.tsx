@@ -127,7 +127,8 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
   const width = Math.max(20, (stdout?.columns ?? 80) - 2);
   // Header (2 lines) + footer (2 lines) + padding line.
   const viewport = Math.max(3, rows - 5);
-  // NO_COLOR: collapse every hardcoded color prop to undefined; dim falls away.
+  // NO_COLOR / non-TTY: map any color name to undefined so no ANSI color is
+  // emitted. dimColor is guarded separately at each call site, not here.
   const col = (c?: string): string | undefined => (colorsEnabled ? c : undefined);
 
   const [level, setLevel] = useState<Level>('categories');
@@ -168,7 +169,10 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
       const outcome = await undoArchive(c.record);
       switch (outcome) {
         case 'restored': setToast(`restored: ${c.label}`); setLastArchive(null); break;
-        case 'missing': setToast('undo: archived file is gone'); break;
+        // The archived file is gone — the record can never restore now, so drop
+        // it (a second `u` reports 'nothing to undo'). 'occupied' keeps it: the
+        // archive still exists and the user can clear the occupant and retry.
+        case 'missing': setToast('undo: archived file is gone'); setLastArchive(null); break;
         case 'occupied': setToast('undo: original path is occupied'); break;
         case 'failed': setToast('undo failed'); break;
       }
@@ -520,7 +524,9 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
       if (input === 'o') {
         const next: SortOrder = order === 'default' ? 'reverse' : order === 'reverse' ? 'label' : 'default';
         setOrder(next);
-        if (selectedCategory !== null) categoryOrdersRef.current.set(selectedCategory.id, next);
+        // Sorting transient search results is ephemeral — don't overwrite the
+        // category's persisted order (restored on re-entry via openCategory).
+        if (selectedCategory !== null && searchSnapshot === null) categoryOrdersRef.current.set(selectedCategory.id, next);
         setItemIndex(0);
         return;
       }
@@ -635,7 +641,7 @@ export const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string 
         <Text color={col('cyan')} bold>Filter (items)</Text>
         <Text color={col('gray')}>  / filter as you type · esc clears the filter then backs out · ⌫/← back keeping filter</Text>
         <Text color={col('cyan')} bold>Sort (items)</Text>
-        <Text color={col('gray')}>  o cycle order: newest → oldest → label</Text>
+        <Text color={col('gray')}>  o cycle order: source → reversed → label</Text>
         <Text color={col('cyan')} bold>Search (items)</Text>
         <Text color={col('gray')}>  s semantic search · enter run · esc cancel / restore list</Text>
         <Text color={col('cyan')} bold>Archive (items)</Text>
