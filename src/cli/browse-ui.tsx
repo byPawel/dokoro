@@ -233,6 +233,10 @@ const BrowseApp: React.FC<{ dokoroPath: string; initialCategory?: string }> = ({
     setItems(outcome.items);
     setItemIndex(0);
     setFilter('');
+    // Results arrive relevance-ranked — a lingering reverse/label order would
+    // silently override that. The per-category memory (categoryOrdersRef) is
+    // untouched, so leaving/re-entering the category still restores it.
+    setOrder('default');
   };
 
   // Refs mirror state for use inside watcher/poller callbacks (stale-closure guard).
