@@ -593,3 +593,28 @@ describe('browseJsonDump', () => {
     expect(out).toContain('\n  "dokoroPath"');
   });
 });
+
+describe('dbDataVersion', () => {
+  it('returns an integer and changes after another connection writes', async () => {
+    const file = path.join(tmpDir, 'dv.sqlite');
+    const a = new Database(file);
+    const b = new Database(file);
+    a.exec('CREATE TABLE t (x INTEGER)');
+    const v1 = mod.dbDataVersion(a);
+    expect(Number.isInteger(v1)).toBe(true);
+    b.prepare('INSERT INTO t (x) VALUES (1)').run(); // OTHER connection commits
+    const v2 = mod.dbDataVersion(a);
+    expect(v2).not.toBe(v1);
+    a.close();
+    b.close();
+  });
+});
+
+describe('claims/agents poll short-circuit', () => {
+  it('returns the same items reference when data_version is unchanged', async () => {
+    insertLiveClaim('src/a.ts');
+    const first = await mod.listItems(tmpDir, 'claims');
+    const second = await mod.listItems(tmpDir, 'claims');
+    expect(second).toBe(first); // cached reference — query skipped
+  });
+});

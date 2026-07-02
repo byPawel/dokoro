@@ -247,6 +247,20 @@ function nowSeconds(sqlite: Database.Database): number {
   return Number(row.n);
 }
 
+/** SQLite per-connection change counter — bumps when ANOTHER connection commits
+ * a write. Lets the poll skip re-querying claims/agents when nothing changed. */
+export function dbDataVersion(db: Database.Database): number {
+  const row = db.prepare('PRAGMA data_version').get() as { data_version: number };
+  return row.data_version;
+}
+
+interface DbListCache {
+  version: number;
+  items: BrowseItem[];
+}
+const claimsCache: { value: DbListCache | null } = { value: null };
+const agentsCache: { value: DbListCache | null } = { value: null };
+
 /** Holder liveness from agent_presence; any failure degrades to 'unknown'. */
 function presenceLabel(sqlite: Database.Database, agentId: string, now: number): 'live' | 'stale' | 'unknown' {
   try {
@@ -488,6 +502,8 @@ function claimItems(dokoroPath: string): BrowseItem[] {
   const sqlite = tryDb(dokoroPath);
   if (sqlite === null) return [dbUnavailableItem('claim')];
   try {
+    const version = dbDataVersion(sqlite);
+    if (claimsCache.value !== null && claimsCache.value.version === version) return claimsCache.value.items;
     const now = nowSeconds(sqlite);
     const rows = sqlite.prepare(
       `SELECT claim_key, file_path, agent_id, session_id, intent,
@@ -497,7 +513,7 @@ function claimItems(dokoroPath: string): BrowseItem[] {
        ORDER BY expires_at ASC`,
     ).all() as ClaimRow[];
 
-    return rows.map((row) => {
+    const items = rows.map((row) => {
       const liveness = presenceLabel(sqlite, row.agent_id, now);
       const expiresIn = formatDuration(row.expires_at - now);
       const detail = [
@@ -520,6 +536,8 @@ function claimItems(dokoroPath: string): BrowseItem[] {
         detail,
       };
     });
+    claimsCache.value = { version, items };
+    return items;
   } catch {
     return [dbUnavailableItem('claim')];
   }
@@ -529,6 +547,8 @@ function agentItems(dokoroPath: string): BrowseItem[] {
   const sqlite = tryDb(dokoroPath);
   if (sqlite === null) return [dbUnavailableItem('agent')];
   try {
+    const version = dbDataVersion(sqlite);
+    if (agentsCache.value !== null && agentsCache.value.version === version) return agentsCache.value.items;
     const now = nowSeconds(sqlite);
     const rows = sqlite.prepare(
       `SELECT agent_id, session_id, status, current_focus, last_heartbeat, heartbeat_seq
@@ -536,7 +556,7 @@ function agentItems(dokoroPath: string): BrowseItem[] {
        ORDER BY last_heartbeat DESC`,
     ).all() as PresenceRow[];
 
-    return rows.map((row) => {
+    const items = rows.map((row) => {
       const age = formatDuration(now - row.last_heartbeat);
       const liveness = now - row.last_heartbeat <= PRESENCE_TTL_SECONDS ? 'live' : 'stale';
       const detail = [
@@ -557,6 +577,8 @@ function agentItems(dokoroPath: string): BrowseItem[] {
         detail,
       };
     });
+    agentsCache.value = { version, items };
+    return items;
   } catch {
     return [dbUnavailableItem('agent')];
   }
