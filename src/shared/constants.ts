@@ -2,6 +2,14 @@
  * Shared constants across all dokoro servers
  */
 
+/**
+ * Package version, reported by server banners (e.g. "dokoro-unified vX.Y.Z").
+ * Kept in sync with package.json by the drift test in constants.test.ts —
+ * runtime package.json reads break under the CJS/ESM split (import.meta is
+ * ESM-only, __dirname is CJS-only).
+ */
+export const DOKORO_VERSION = '0.3.1';
+
 export const LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
 export const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 

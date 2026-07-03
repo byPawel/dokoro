@@ -14,16 +14,12 @@
  */
 
 const sub = process.argv[2];
-// Every subcommand the compiled CLI handles (see src/dokoro-cli.ts printHelp/main).
-// Anything missing here silently falls through to the MCP stdio server, which
-// looks like a hang — keep this in sync with the CLI's command switch.
-const CLI_COMMANDS = new Set([
-  'init', 'migrate', 'search', 'list', 'ls', 'get', 'show', 'update',
-  'tags', 'tag', 'untag', 'browse', 'session', 'time', 'cleanup',
-  'help', '--help', '-h', 'version', '--version', '-v',
-]);
 
-if (sub && CLI_COMMANDS.has(sub)) {
+if (sub) {
+  // Any argument at all → the CLI. It owns the full command switch and fails
+  // loudly ("Unknown command" + help, exit 1) on anything it doesn't know.
+  // An allowlist here once let `dokoro browse` fall through to the MCP server
+  // when the two drifted — the server sits reading stdin and looks like a hang.
   await import('../dist/esm/dokoro-cli.js');
 } else {
   // No subcommand → run the MCP server (stdio). Default to the unified server so a

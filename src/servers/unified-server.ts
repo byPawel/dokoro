@@ -19,6 +19,7 @@ import { entityTools } from '../tools/entity-tools.js';
 import { presenceTools } from '../tools/presence-tools.js';
 import { fileClaimTools } from '../tools/file-claim-tools.js';
 import { archiveTools } from '../tools/archive-tools.js';
+import { DOKORO_VERSION } from '../shared/constants.js';
 import type { ToolDefinition } from '../tools/registry.js';
 
 // NOTE: the unified server registers a curated subset of tools — core-server.ts
@@ -64,7 +65,7 @@ async function main() {
 
   const config = {
     name: 'dokoro-unified',
-    version: '2.0.0',
+    version: DOKORO_VERSION,
     description: 'Unified Dokoro MCP Server - all tools in one process',
   };
 
