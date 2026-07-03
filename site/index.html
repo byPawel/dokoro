@@ -976,7 +976,7 @@ npm install --omit=optional</pre>
       </div>
       <div class="meta">
         <b>PACKAGE</b><br>dokoro · v0.3.1<br><br>
-        <b>BUILT ON</b><br>MCP TypeScript SDK<br><br>
+        <span id="npmDl"></span><b>BUILT ON</b><br>MCP TypeScript SDK<br><br>
         <b>LICENSE</b><br>MIT
       </div>
       <div class="meta">
@@ -1221,6 +1221,18 @@ const gateCfg={
 const diagrams=[];
 function initDia(id,cfg){const root=document.getElementById(id);if(root)diagrams.push({root,fd:new FlowDiagram(root,cfg)});}
 initDia("dia-loop",loopCfg);initDia("dia-affective",affectiveCfg);initDia("dia-bridge",bridgeCfg);initDia("dia-gate",gateCfg);
+
+/* ---- npm monthly downloads (footer) — shown only if the API answers ---- */
+(function(){
+  const el=document.getElementById("npmDl");if(!el)return;
+  fetch("https://api.npmjs.org/downloads/point/last-month/dokoro")
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(!d||typeof d.downloads!=="number")return;
+      el.innerHTML=`<b>NPM · LAST MONTH</b><br>${d.downloads.toLocaleString("en-US")} downloads<br><br>`;
+    })
+    .catch(()=>{});
+})();
 
 /* ---- TEMPORAL slider ---- */
 (function(){
